@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Working agreement
+
+**Default: do NOT `git commit` or `git push` unless the user explicitly asks.** Make and save file changes freely, but stop before committing and wait for an explicit "commit"/"push".
+
+**Scoped exception (active 2026-05-29):** During execution of the ingestion+KG plan, the user authorized **per-task local commits on `main`**. So: committing locally per the plan's commit steps is OK; **pushing still requires explicit permission.**
+
 ## What this repository is
 
 This is a **Hack Zurich / START Hack hackathon** workspace for the **SIX "Build the Company Brain – Unlocking Knowledge"** challenge. As of now it contains **only the source corpus** — regulatory PDFs, FinDatEx template spreadsheets, an attribute-mapping spreadsheet, and SME interview transcripts. **There is no application code, build system, tests, or dependencies yet.** Any code you add is greenfield; choose the stack.
