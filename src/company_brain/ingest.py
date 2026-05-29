@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def ingest_path(root: str, *, store, provider, embedder, settings) -> dict:
-    summary = {"structured": 0, "unstructured": 0, "skipped": 0}
+    summary = {"structured": 0, "unstructured": 0, "skipped": 0, "errors": 0}
     for path in sorted(Path(root).rglob("*")):
         if not path.is_file() or path.name.startswith("."):
             continue
@@ -27,31 +27,35 @@ def ingest_path(root: str, *, store, provider, embedder, settings) -> dict:
         domain = infer_domain(path.name)
         sens = infer_sensitivity(path.name)
 
-        if ftype == "xlsx":
-            doc = load_structured(str(path), domain=domain, sensitivity=sens)
-            store.upsert_document(doc)
-            merge_backbone(store, doc.records or [])
-            summary["structured"] += 1
-            logger.info("structured: %s (%d records)", path.name, len(doc.records or []))
+        try:
+            if ftype == "xlsx":
+                doc = load_structured(str(path), domain=domain, sensitivity=sens)
+                store.upsert_document(doc)
+                merge_backbone(store, doc.records or [])
+                summary["structured"] += 1
+                logger.info("structured: %s (%d records)", path.name, len(doc.records or []))
 
-        elif ftype in {"pdf", "docx", "pptx"}:
-            doc = load_unstructured(str(path), source_type=ftype, domain=domain, sensitivity=sens)
-            doc.markdown = anonymize(doc.markdown or "")
-            store.upsert_document(doc)
-            chunks = chunk_markdown(doc, settings.chunk_max_chars, settings.chunk_overlap_chars)
-            if chunks:
-                vecs = embedder.embed([c.text for c in chunks])
-                for c, v in zip(chunks, vecs):
-                    c.embedding = v
-                    store.upsert_chunk(c)
-                for c in chunks:
-                    store.merge_extraction(extract_entities(c.text, provider), chunk_id=c.chunk_id)
-            summary["unstructured"] += 1
-            logger.info("unstructured: %s (%d chunks)", path.name, len(chunks))
+            elif ftype in {"pdf", "docx", "pptx"}:
+                doc = load_unstructured(str(path), source_type=ftype, domain=domain, sensitivity=sens)
+                doc.markdown = anonymize(doc.markdown or "")
+                store.upsert_document(doc)
+                chunks = chunk_markdown(doc, settings.chunk_max_chars, settings.chunk_overlap_chars)
+                if chunks:
+                    vecs = embedder.embed([c.text for c in chunks])
+                    for c, v in zip(chunks, vecs):
+                        c.embedding = v
+                        store.upsert_chunk(c)
+                    for c in chunks:
+                        store.merge_extraction(extract_entities(c.text, provider), chunk_id=c.chunk_id)
+                summary["unstructured"] += 1
+                logger.info("unstructured: %s (%d chunks)", path.name, len(chunks))
 
-        else:
-            summary["skipped"] += 1
-            logger.info("skipped (type=%s): %s", ftype, path.name)
+            else:
+                summary["skipped"] += 1
+                logger.info("skipped (type=%s): %s", ftype, path.name)
+        except Exception:
+            summary["errors"] += 1
+            logger.exception("failed to ingest %s", path.name)
     return summary
 
 

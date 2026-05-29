@@ -44,3 +44,22 @@ def test_ingests_structured_and_unstructured(tmp_path, store, fake_provider, fak
     assert store.run("MATCH (:Regulation)-[:REQUIRES]->(:DataAttribute) RETURN count(*) AS c")[0]["c"] == 2
     assert store.run("MATCH (i:Insight)-[:DERIVED_FROM]->(:Chunk) RETURN count(i) AS c")[0]["c"] >= 1
     assert store.run("MATCH (i:Insight) WHERE i.text CONTAINS 'Walter' RETURN count(i) AS c")[0]["c"] == 0
+
+
+@requires_neo4j
+def test_bad_file_does_not_abort_run(tmp_path, store, fake_provider, fake_embedder, monkeypatch):
+    from openpyxl import Workbook
+    wb = Workbook(); ws = wb.active
+    ws.append(["Regulation", "Data attribute"]); ws.append(["SFDR", "Waste"])
+    good = tmp_path / "SIX_Data Attributes.xlsx"; wb.save(good)
+
+    # a pdf whose loader will raise
+    import company_brain.loaders.unstructured as u
+    def _boom(path): raise RuntimeError("bad pdf")
+    monkeypatch.setattr(u, "_convert", _boom)
+    bad = tmp_path / "EU_SFDR_broken.pdf"; bad.write_bytes(b"%PDF-1.5 fake")
+
+    summary = ingest_path(str(tmp_path), store=store, provider=fake_provider(),
+                          embedder=fake_embedder(), settings=get_settings())
+    assert summary["errors"] == 1          # the bad pdf was caught
+    assert summary["structured"] == 1      # the good xlsx still processed
