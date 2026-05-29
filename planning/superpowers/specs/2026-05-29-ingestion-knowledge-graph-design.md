@@ -29,8 +29,10 @@ Hackathon judging criteria this design targets directly:
 
 ## 3. Extraction strategy (chosen: Hybrid backbone + guided extraction)
 
-- **Structured files** (attribute spreadsheet, EMT/EET templates) → parsed **deterministically** with pandas/openpyxl into exact graph nodes/edges. **No LLM, no cost, no hallucination.** This is the authoritative spine.
+- **Structured files** (real spreadsheets — currently only `SIX_Data Attributes.xlsx`) → parsed **deterministically** with openpyxl into exact graph nodes/edges. **No LLM, no cost, no hallucination.** This is the authoritative spine.
 - **Unstructured files** (PDFs, handbooks, transcripts, future audio) → normalized to markdown, chunked, then **ontology-guided LLM extraction** into the core types, allowed to add free-form `Insight`/`Concept` nodes, each tagged with its source chunk.
+
+> **Correction (post-review discovery):** The EMT (`EU_MIFID_Template...xlsx`, 21pp) and EET (`EU_ESG_Template...xlsx`, 161pp) files are **PDFs with mislabeled `.xlsx` extensions**, not spreadsheets. They route through the **unstructured** path. Loader routing therefore **detects file type by content (magic bytes)**, not extension (§4). The 161-page EET is the largest single extraction-cost item; the orchestrator supports a per-doc page cap to manage budget (§12).
 
 Rejected alternatives: pure fixed-ontology (too rigid, drops unanticipated knowledge, won't absorb chat feedback); pure open GraphRAG (noisy, inconsistent node identity, unreliable for an *authoritative/traceable* demo).
 
@@ -38,7 +40,8 @@ Rejected alternatives: pure fixed-ontology (too rigid, drops unanticipated knowl
 
 - **Unstructured → markdown: Microsoft `markitdown`.** One library for PDF/`.docx`/`.pptx`/HTML/audio; preserves headings/tables; LLM-friendly output; supports future audio transcription.
   - **Caveat:** `markitdown` extracts embedded PDF text but does **not OCR scanned pages**. The 9MB tax-navigator PDF may be image-based. Pipeline **logs low-yield extractions** so a near-empty doc is visible, not silently lost. Optional Tesseract OCR fallback if needed; otherwise consciously skip and log.
-- **Structured → records: pandas/openpyxl.** Do **not** route structured grids through markitdown — flattening to a markdown table blob loses exact structure and would cost tokens to re-extract data we already have perfectly.
+- **Type detection by content, not extension.** A `route(path)` helper sniffs magic bytes (`PK\x03\x04` → xlsx/zip, `%PDF` → pdf) and falls back to extension only when ambiguous. This is why the mislabeled EMT/EET PDFs route correctly.
+- **Structured → records: openpyxl.** Do **not** route structured grids through markitdown — flattening to a markdown table blob loses exact structure and would cost tokens to re-extract data we already have perfectly.
 
 Both paths emit the same `Document` object; everything downstream is identical.
 
@@ -50,7 +53,8 @@ Modular, config-driven. Each module has one responsibility.
 |---|---|---|
 | `config.py` | Single source of truth: Neo4j URI/user/pw, provider + model IDs, embedder name, paths, sensitivity defaults — all from env. **Local→Aura and provider swaps are env-only.** | — |
 | `model.py` | The source-agnostic `Document` dataclass + `Chunk` dataclass | — |
-| `loaders/structured.py` | Attribute sheet + EMT/EET → exact records | pandas/openpyxl |
+| `loaders/router.py` | Detect file type by magic bytes; dispatch to structured vs unstructured loader | — |
+| `loaders/structured.py` | Real spreadsheets (`SIX_Data Attributes.xlsx`) → exact records | openpyxl |
 | `loaders/unstructured.py` | PDF/docx/pptx/audio → markdown; logs low-yield (OCR caveat) | markitdown |
 | `anonymize.py` | Strip person names → roles, **before** anything else sees the text | regex + Claude fallback |
 | `chunk.py` | Split markdown by section with overlap → `Chunk` records | — |
@@ -189,3 +193,15 @@ Python · markitdown · pandas/openpyxl · anthropic SDK (Sonnet, tool-use struc
 - OCR fallback for scanned PDFs: implement Tesseract or skip-and-log? **Default: skip-and-log; revisit if a key doc comes back empty.**
 - Anonymization robustness: regex+Claude vs dedicated NER (spaCy/Presidio). **Default: regex+Claude for hackathon; Presidio is a drop-in upgrade behind `anonymize.py`.**
 - Chunking granularity (section vs fixed-token) — tune during implementation against extraction quality.
+
+## 16. Known limitations (post-implementation, from final review)
+
+Built and verified end-to-end (36 tests green; dry-run over real sample docs with a stubbed LLM). Honest limits to keep in mind — say these accurately in the demo rather than over-claiming:
+
+- **Provenance is on entities and insights, not relationships or the backbone.** Every `:Insight` (`DERIVED_FROM`) and extracted entity (`MENTIONED_IN`) traces to a `:Chunk`→`:Document`+sensitivity. The deterministic backbone (`Regulation-[:REQUIRES]->DataAttribute`) and LLM-extracted relationship edges carry **no** chunk link. Frame it as: *"entities and insights are chunk-traced; the backbone is deterministic from a known source file."*
+- **Relationship/`about` endpoints MERGE by (label, name).** If the LLM labels an existing backbone node differently (e.g. calls a `DataAttribute` an `InstrumentType`), a second same-name node is created under the new label, fragmenting the graph. Mitigation deferred: a label-agnostic match-by-name or a post-ingest reconciliation pass.
+- **Re-ingest idempotency depends on stable file paths.** `doc_id`/`chunk_id`/`insight_id` derive from the file path; re-running the *same* path is now idempotent (backbone, entities, and insights all MERGE). Ingesting a copy at a *different* path creates parallel doc/chunk/insight nodes.
+- **Vector-index dimension is fixed at creation.** Switching `EMBEDDING_MODEL` (or mixing the dim-8 test fixtures with the real 384-dim model) against the same DB requires `DROP INDEX chunk_vec IF EXISTS` before `ensure_schema` (the demo does this). Otherwise vector search errors on dimension mismatch.
+- **Anonymization only strips confirmed *speakers*** (declared `Name (Role)` **and** used as a `Name:` line label). A personal name appearing only in prose (never as a speaker) is not stripped by `anonymize.py`; the extraction prompt's role-not-name instruction is the only backstop there.
+- **`MAX_PDF_PAGES` is not wired** into the loader; cost on the 161-page EET PDF is controlled by capping chunks or skipping at run time, not by page.
+- **Real-corpus ingest not yet run** (no Claude credits spent). The pipeline is exercised only with a stubbed LLM + local embedder so far.
