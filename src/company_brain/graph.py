@@ -23,6 +23,8 @@ class GraphStore:
             "CREATE CONSTRAINT concept_name IF NOT EXISTS FOR (n:Concept) REQUIRE n.name IS UNIQUE",
             "CREATE CONSTRAINT doc_id IF NOT EXISTS FOR (n:Document) REQUIRE n.doc_id IS UNIQUE",
             "CREATE CONSTRAINT chunk_id IF NOT EXISTS FOR (n:Chunk) REQUIRE n.chunk_id IS UNIQUE",
+            "CREATE CONSTRAINT obligation_name IF NOT EXISTS FOR (n:Obligation) REQUIRE n.name IS UNIQUE",
+            "CREATE CONSTRAINT insight_id IF NOT EXISTS FOR (n:Insight) REQUIRE n.insight_id IS UNIQUE",
         ]
         for c in constraints:
             self.run(c)
@@ -101,17 +103,20 @@ class GraphStore:
                 sn=sn, tn=tn,
             )
 
-        for ins in extraction.get("insights", []):
+        for idx, ins in enumerate(extraction.get("insights", [])):
             text = ins.get("text")
             if not text:
                 continue
+            insight_id = f"{chunk_id}::ins::{idx}"
             self.run(
                 """
                 MATCH (c:Chunk {chunk_id: $chunk_id})
-                CREATE (i:Insight {text: $text, role: $role})
+                MERGE (i:Insight {insight_id: $insight_id})
+                SET i.text = $text, i.role = $role
                 MERGE (i)-[:DERIVED_FROM]->(c)
                 """,
-                chunk_id=chunk_id, text=text, role=ins.get("role", "unknown"),
+                chunk_id=chunk_id, insight_id=insight_id, text=text,
+                role=ins.get("role", "unknown"),
             )
             for about in ins.get("about", []):
                 lbl, nm = about.get("type"), about.get("name")
@@ -119,11 +124,11 @@ class GraphStore:
                     continue
                 self.run(
                     f"""
-                    MATCH (i:Insight {{text: $text}})
+                    MATCH (i:Insight {{insight_id: $insight_id}})
                     MERGE (n:{lbl} {{name: $nm}})
                     MERGE (i)-[:ABOUT]->(n)
                     """,
-                    text=text, nm=nm,
+                    insight_id=insight_id, nm=nm,
                 )
 
     def vector_search(self, query_embedding, k: int, max_sensitivity: str = "C2 Internal"):

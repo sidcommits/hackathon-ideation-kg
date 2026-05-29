@@ -67,3 +67,21 @@ def test_merge_extraction_links_to_chunk_and_backbone(store):
     ins = store.run("MATCH (i:Insight)-[:DERIVED_FROM]->(:Chunk {chunk_id:'d2::0'}) RETURN i.role AS role, i.text AS text")
     assert ins[0]["role"] == "Compliance Officer"
     assert store.run("MATCH (:InstrumentType {name:'structured note'})-[:MENTIONED_IN]->(:Chunk) RETURN count(*) AS c")[0]["c"] >= 1
+
+
+@requires_neo4j
+def test_merge_extraction_is_idempotent_for_insights(store):
+    store.upsert_document(Document(doc_id="d3", source_path="p", source_type="pdf",
+                                   title="t", domain="g", sensitivity="C2 Internal"))
+    store.upsert_chunk(Chunk(chunk_id="d3::0", doc_id="d3", text="x", ordinal=0,
+                             embedding=[0.0] * 8))
+    extraction = {"entities": [], "relationships": [],
+                  "insights": [{"text": "Coverage depends on classification.",
+                                "role": "Compliance Officer",
+                                "about": [{"type": "Concept", "name": "coverage"}]}]}
+    store.merge_extraction(extraction, chunk_id="d3::0")
+    store.merge_extraction(extraction, chunk_id="d3::0")   # re-run must not duplicate
+    n = store.run("MATCH (i:Insight)-[:DERIVED_FROM]->(:Chunk {chunk_id:'d3::0'}) RETURN count(i) AS c")[0]["c"]
+    assert n == 1
+    about = store.run("MATCH (:Insight {insight_id:'d3::0::ins::0'})-[:ABOUT]->(:Concept {name:'coverage'}) RETURN count(*) AS c")[0]["c"]
+    assert about == 1
