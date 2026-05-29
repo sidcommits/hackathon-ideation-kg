@@ -16,7 +16,8 @@ def detect_type(path: str) -> str:
         return "pdf"
     if head == b"PK\x03\x04":
         try:
-            names = zipfile.ZipFile(path).namelist()
+            with zipfile.ZipFile(path) as zf:
+                names = zf.namelist()
         except zipfile.BadZipFile:
             return "unknown"
         for marker, kind in _OFFICE_MARKERS.items():
