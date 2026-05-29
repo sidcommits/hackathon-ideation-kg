@@ -12,6 +12,7 @@ def fake_provider():
         def extract(self, system, text, schema):
             self.calls.append(text)
             return self.canned
+    # Returns the CLASS intentionally — tests instantiate via fake_provider(canned)
     return FakeProvider
 
 
@@ -29,16 +30,21 @@ def fake_embedder():
                     v[i % 8] += (ord(ch) % 17) / 100.0
                 out.append(v)
             return out
+    # Returns the CLASS intentionally — tests instantiate via fake_embedder()
     return FakeEmbedder
 
 
 def neo4j_available():
-    from neo4j import GraphDatabase
     uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
     user = os.getenv("NEO4J_USER", "neo4j")
     pw = os.getenv("NEO4J_PASSWORD", "testpassword")
     try:
-        d = GraphDatabase.driver(uri, auth=(user, pw))
+        from neo4j import GraphDatabase
+        d = GraphDatabase.driver(
+            uri, auth=(user, pw),
+            connection_timeout=3,
+            connection_acquisition_timeout=3,
+        )
         d.verify_connectivity()
         d.close()
         return True
