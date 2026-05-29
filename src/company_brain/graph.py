@@ -60,6 +60,72 @@ class GraphStore:
             ordinal=chunk.ordinal, embedding=chunk.embedding,
         )
 
+    _NODE_LABELS = {"Regulation", "DataAttribute", "InstrumentType", "Obligation", "Concept"}
+
+    def merge_extraction(self, extraction: dict, chunk_id: str) -> None:
+        """Write extracted entities/relationships/insights, all traced to `chunk_id`.
+
+        Entities MERGE by (label, name) so they resolve against existing backbone
+        nodes instead of duplicating. Relationships and insights link to those nodes;
+        every entity/insight gets provenance to the source chunk.
+        """
+        for ent in extraction.get("entities", []):
+            label = ent.get("type")
+            name = ent.get("name")
+            if label not in self._NODE_LABELS or not name:
+                continue
+            self.run(
+                f"""
+                MATCH (c:Chunk {{chunk_id: $chunk_id}})
+                MERGE (n:{label} {{name: $name}})
+                SET n.aliases = coalesce($aliases, n.aliases)
+                MERGE (n)-[:MENTIONED_IN]->(c)
+                """,
+                chunk_id=chunk_id, name=name, aliases=ent.get("aliases"),
+            )
+
+        for rel in extraction.get("relationships", []):
+            st, sn = rel.get("source_type"), rel.get("source_name")
+            tt, tn = rel.get("target_type"), rel.get("target_name")
+            r = rel.get("rel")
+            if st not in self._NODE_LABELS or tt not in self._NODE_LABELS:
+                continue
+            if r not in {"REQUIRES", "APPLIES_TO", "GOVERNS", "DEFINES", "RELATED_TO"}:
+                continue
+            self.run(
+                f"""
+                MERGE (s:{st} {{name: $sn}})
+                MERGE (t:{tt} {{name: $tn}})
+                MERGE (s)-[:{r}]->(t)
+                """,
+                sn=sn, tn=tn,
+            )
+
+        for ins in extraction.get("insights", []):
+            text = ins.get("text")
+            if not text:
+                continue
+            self.run(
+                """
+                MATCH (c:Chunk {chunk_id: $chunk_id})
+                CREATE (i:Insight {text: $text, role: $role})
+                MERGE (i)-[:DERIVED_FROM]->(c)
+                """,
+                chunk_id=chunk_id, text=text, role=ins.get("role", "unknown"),
+            )
+            for about in ins.get("about", []):
+                lbl, nm = about.get("type"), about.get("name")
+                if lbl not in self._NODE_LABELS or not nm:
+                    continue
+                self.run(
+                    f"""
+                    MATCH (i:Insight {{text: $text}})
+                    MERGE (n:{lbl} {{name: $nm}})
+                    MERGE (i)-[:ABOUT]->(n)
+                    """,
+                    text=text, nm=nm,
+                )
+
     def vector_search(self, query_embedding, k: int, max_sensitivity: str = "C2 Internal"):
         allowed = [s for s, r in _SENS_RANK.items() if r <= _SENS_RANK.get(max_sensitivity, 1)]
         return self.run(

@@ -41,3 +41,29 @@ def test_vector_search_respects_sensitivity(store):
     hits = store.vector_search([1.0] + [0.0] * 7, k=5, max_sensitivity="C2 Internal")
     ids = {h["doc_id"] for h in hits}
     assert "pub" in ids and "sec" not in ids   # confidential filtered out
+
+
+@requires_neo4j
+def test_merge_extraction_links_to_chunk_and_backbone(store):
+    # backbone already has MiFIR
+    store.run("MERGE (:Regulation {name:'MiFIR'})")
+    store.upsert_document(Document(doc_id="d2", source_path="p", source_type="pdf",
+                                   title="t", domain="mifid", sensitivity="C2 Internal"))
+    store.upsert_chunk(Chunk(chunk_id="d2::0", doc_id="d2", text="...", ordinal=0,
+                             embedding=[0.0] * 8))
+    extraction = {
+        "entities": [{"type": "Regulation", "name": "MiFIR", "aliases": ["MiFID II"]},
+                     {"type": "InstrumentType", "name": "structured note"}],
+        "relationships": [{"source_type": "Regulation", "source_name": "MiFIR",
+                           "rel": "GOVERNS", "target_type": "InstrumentType",
+                           "target_name": "structured note"}],
+        "insights": [{"text": "Coverage depends on classification.",
+                      "role": "Compliance Officer",
+                      "about": [{"type": "InstrumentType", "name": "structured note"}]}],
+    }
+    store.merge_extraction(extraction, chunk_id="d2::0")
+    assert store.run("MATCH (r:Regulation {name:'MiFIR'}) RETURN count(r) AS c")[0]["c"] == 1
+    assert store.run("MATCH (:Regulation)-[g:GOVERNS]->(:InstrumentType) RETURN count(g) AS c")[0]["c"] == 1
+    ins = store.run("MATCH (i:Insight)-[:DERIVED_FROM]->(:Chunk {chunk_id:'d2::0'}) RETURN i.role AS role, i.text AS text")
+    assert ins[0]["role"] == "Compliance Officer"
+    assert store.run("MATCH (:InstrumentType {name:'structured note'})-[:MENTIONED_IN]->(:Chunk) RETURN count(*) AS c")[0]["c"] >= 1
