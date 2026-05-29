@@ -44,3 +44,40 @@ def test_get_provider_stub_raises(monkeypatch):
     import pytest
     with pytest.raises(NotImplementedError):
         get_provider(get_settings())
+
+
+def test_get_embedder_local(monkeypatch):
+    import company_brain.providers.embedder as emb
+    from company_brain.config import get_settings
+
+    class _FakeST:
+        def __init__(self, name): pass
+        def encode(self, texts, normalize_embeddings=True):
+            return [[0.1, 0.2, 0.3] for _ in texts]
+        def get_sentence_embedding_dimension(self): return 3
+
+    monkeypatch.setenv("EMBEDDER", "local")
+    monkeypatch.setattr(emb, "_load_model", lambda name: _FakeST(name))
+    e = emb.get_embedder(get_settings())
+    vecs = e.embed(["a", "b"])
+    assert len(vecs) == 2 and e.dim == 3
+
+
+def test_get_embedder_stub_raises(monkeypatch):
+    import company_brain.providers.embedder as emb
+    from company_brain.config import get_settings
+    import pytest
+    monkeypatch.setenv("EMBEDDER", "openai")
+    with pytest.raises(NotImplementedError):
+        emb.get_embedder(get_settings())
+
+
+import pytest
+
+
+@pytest.mark.integration
+def test_local_embedder_real_dim():
+    from company_brain.providers.embedder import LocalEmbedder
+    e = LocalEmbedder("BAAI/bge-small-en-v1.5")
+    v = e.embed(["MiFIR reporting"])
+    assert len(v) == 1 and len(v[0]) == e.dim == 384
