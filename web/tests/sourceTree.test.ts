@@ -25,6 +25,10 @@ describe("resolveChain", () => {
 });
 
 describe("buildSourceTree", () => {
+  it("returns [] for no citations", () => {
+    expect(buildSourceTree([], PROV)).toEqual([]);
+  });
+
   it("merges documents sharing a chain prefix under shared parents", () => {
     const tree = buildSourceTree(
       [cite("ABC.pdf", "p1"), cite("DEF.pdf", "p2")],
