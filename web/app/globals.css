@@ -33,6 +33,46 @@
   /* Sensitivity */
   --sev-internal:  #E0A93B; /* amber */
   --sev-conf:      #F1607E; /* rose  */
+
+  /* Theme-dependent atmospherics (overridden in light mode) */
+  --grid-line:     rgba(255, 255, 255, 0.018);
+  --glass-top:     rgba(255, 255, 255, 0.025);
+  --glass-inset:   rgba(255, 255, 255, 0.03);
+  --glass-shadow:  rgba(0, 0, 0, 0.6);
+  --code-bg:       rgba(255, 255, 255, 0.06);
+}
+
+/* ============================================================
+   LIGHT MODE — clean institutional daylight (Linear / Stripe tone)
+   Cool off-white canvas, ink-slate text, same teal accent.
+   ============================================================ */
+:root[data-theme="light"] {
+  --bg:        #F7F8FA;
+  --bg-2:      #FFFFFF;
+  --bg-3:      #FFFFFF;
+  --line:      #E5E8EC;
+  --line-2:    #D2D7DE;
+
+  --fg:        #0E1117;
+  --fg-2:      #475063;
+  --fg-3:      #8A93A2;
+
+  --accent:        #0E9D8A;
+  --accent-dim:    #0B7A6C;
+  --accent-glow:   rgba(14, 157, 138, 0.16);
+
+  --node-backbone:  #0F9D63;
+  --node-reasoning: #2563EB;
+  --node-provenance:#9333EA;
+
+  --sev-internal:  #B7791F;
+  --sev-conf:      #DB2777;
+
+  --grid-line:     rgba(15, 23, 42, 0.04);
+  --glass-top:     rgba(15, 23, 42, 0.015);
+  --glass-inset:   rgba(255, 255, 255, 0.8);
+  --glass-shadow:  rgba(15, 23, 42, 0.10);
+  --code-bg:       rgba(15, 23, 42, 0.05);
 }
 
 @theme inline {
@@ -56,6 +96,14 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Smooth, professional theme cross-fade */
+body,
+.glass,
+.brain-canvas,
+.tool-card {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
 /* ---- Atmospheric backdrop: a faint top-lit aurora + grid grain ---- */
 .brain-canvas {
   position: relative;
@@ -71,8 +119,8 @@ body {
   inset: 0;
   z-index: -1;
   background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
   background-size: 44px 44px;
   mask-image: radial-gradient(120% 100% at 50% 0%, #000 30%, transparent 90%);
 }
@@ -190,12 +238,12 @@ body {
 
 /* ---- Glass elevation utility ---- */
 .glass {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0) 40%),
+  background: linear-gradient(180deg, var(--glass-top), transparent 40%),
     var(--bg-3);
   border: 1px solid var(--line);
   box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.03) inset,
-    0 8px 24px -12px rgba(0, 0, 0, 0.6);
+    0 1px 0 0 var(--glass-inset) inset,
+    0 8px 24px -12px var(--glass-shadow);
   backdrop-filter: blur(8px);
 }
 
@@ -207,10 +255,44 @@ body {
     0 0 0 4px var(--accent-glow);
 }
 
-/* ---- Markdown / prose tuning inside bubbles ---- */
+/* ---- Markdown / prose tuning inside bubbles ----
+   Bind Tailwind Typography's color tokens to our theme vars. We set BOTH the
+   normal and the `-invert-` variants so the hardcoded `prose-invert` class on
+   the bubble can't override them — text stays readable in light AND dark mode.
+   (Light-mode bug: prose-invert made body paragraphs light-grey on white.) */
+.prose {
+  --tw-prose-body: var(--fg-2);
+  --tw-prose-headings: var(--fg);
+  --tw-prose-bold: var(--fg);
+  --tw-prose-counters: var(--fg-3);
+  --tw-prose-bullets: var(--line-2);
+  --tw-prose-hr: var(--line);
+  --tw-prose-quotes: var(--fg-2);
+  --tw-prose-quote-borders: var(--line-2);
+  --tw-prose-links: var(--accent);
+  --tw-prose-code: var(--fg);
+  --tw-prose-pre-bg: var(--bg-2);
+  --tw-prose-th-borders: var(--line-2);
+  --tw-prose-td-borders: var(--line);
+
+  --tw-prose-invert-body: var(--fg-2);
+  --tw-prose-invert-headings: var(--fg);
+  --tw-prose-invert-bold: var(--fg);
+  --tw-prose-invert-counters: var(--fg-3);
+  --tw-prose-invert-bullets: var(--line-2);
+  --tw-prose-invert-hr: var(--line);
+  --tw-prose-invert-quotes: var(--fg-2);
+  --tw-prose-invert-quote-borders: var(--line-2);
+  --tw-prose-invert-links: var(--accent);
+  --tw-prose-invert-code: var(--fg);
+  --tw-prose-invert-pre-bg: var(--bg-2);
+  --tw-prose-invert-th-borders: var(--line-2);
+  --tw-prose-invert-td-borders: var(--line);
+}
+
 .prose :where(code):not(:where(pre code)) {
   font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--code-bg);
   padding: 0.1em 0.36em;
   border-radius: 5px;
   font-size: 0.86em;
@@ -224,6 +306,21 @@ body {
 .prose :where(strong) {
   color: var(--fg);
   font-weight: 650;
+}
+
+/* Hard override: set readable colors directly on elements so neither the
+   `prose-invert` utility nor the `--tw-prose-*` tokens can wash them out in
+   light mode. Body text uses primary --fg for strong contrast on white. */
+.prose,
+.prose :where(p, li, ul, ol, blockquote, td, th, span):not(:where([class~="not-prose"] *)) {
+  color: var(--fg);
+}
+.prose :where(h1, h2, h3, h4, h5, h6) {
+  color: var(--fg);
+}
+.prose :where(ol > li)::marker,
+.prose :where(ul > li)::marker {
+  color: var(--fg-3);
 }
 .prose :where(p):first-child {
   margin-top: 0;

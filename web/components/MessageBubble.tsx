@@ -5,9 +5,11 @@ import { CitationChip } from "@/components/CitationChip";
 export function MessageBubble({
   m,
   streaming = false,
+  onOpenSources,
 }: {
   m: Message;
   streaming?: boolean;
+  onOpenSources?: (m: Message) => void;
 }) {
   const isUser = m.role === "user";
   const isEmpty = m.text.length === 0;
@@ -40,9 +42,24 @@ export function MessageBubble({
 
         {m.citations && m.citations.length > 0 && (
           <div className="mt-3 flex flex-col gap-2 border-t border-[color:var(--line)] pt-3">
-            <span className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-[color:var(--fg-3)]">
-              Sources
-            </span>
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-[color:var(--fg-3)]">
+                Sources
+              </span>
+              {onOpenSources && (
+                <button
+                  type="button"
+                  onClick={() => onOpenSources(m)}
+                  className="flex items-center gap-1 rounded-md border border-[color:var(--line)] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-[color:var(--fg-3)] transition-colors hover:border-[color:var(--accent-dim)] hover:text-[color:var(--accent)] cursor-pointer"
+                  title="View sources & relations as a tree"
+                >
+                  Tree view
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M9 6l6 6-6 6" />
+                  </svg>
+                </button>
+              )}
+            </div>
             <div className="flex flex-wrap gap-1.5">
               {m.citations.map((c, i) => (
                 <CitationChip key={i} c={c} />

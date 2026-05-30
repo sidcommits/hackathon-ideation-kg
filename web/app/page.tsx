@@ -5,6 +5,9 @@ import { ChatThread } from "@/components/ChatThread";
 import { GraphCanvas } from "@/components/GraphCanvas";
 import { ClearanceSelector } from "@/components/ClearanceSelector";
 import { AvatarStage } from "@/components/AvatarStage";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { SourcesPanel } from "@/components/SourcesPanel";
+import type { Message } from "@/lib/chatReducer";
 
 export default function Home() {
   const {
@@ -27,6 +30,15 @@ export default function Home() {
   const [registering, setRegistering] = useState(false);
   const hasMessages = state.messages.length > 0;
 
+  // Sources & Relations slide-in panel.
+  const [sourcesMsg, setSourcesMsg] = useState<Message | null>(null);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const openSources = (m: Message) => {
+    setSourcesMsg(m);
+    setSourcesOpen(true);
+  };
+  const latestAnswer = [...state.messages].reverse().find((m) => m.role === "assistant") ?? null;
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const q = input.trim();
@@ -38,7 +50,7 @@ export default function Home() {
   return (
     <main className="brain-canvas grid h-screen grid-cols-1 text-[color:var(--fg)] lg:grid-cols-[1fr_minmax(420px,500px)]">
       {/* ── Conversation column ─────────────────────────────── */}
-      <section className="flex min-w-0 flex-col overflow-hidden">
+      <section className="relative flex min-w-0 flex-col overflow-hidden">
         <header className="flex items-center justify-between border-b border-[color:var(--line)] px-6 py-3.5">
           <div className="flex items-center gap-3">
             <BrandMark />
@@ -62,6 +74,7 @@ export default function Home() {
               disabled={busy || !!activeCall}
             />
             <StatusPill busy={busy} />
+            <ThemeToggle />
             <button
               onClick={() => setShowConfig(!showConfig)}
               className="flex h-8 w-8 items-center justify-center rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-2)]/70 text-[color:var(--fg-2)] hover:text-[color:var(--fg)] hover:border-[color:var(--accent-dim)] transition-all cursor-pointer"
@@ -126,12 +139,12 @@ export default function Home() {
                 />
               </div>
               <div className="h-[220px] overflow-y-auto border border-[color:var(--line)] rounded-2xl bg-[color:var(--bg-2)]/30 p-4">
-                <ChatThread state={state} />
+                <ChatThread state={state} onOpenSources={openSources} />
               </div>
             </div>
           ) : hasMessages ? (
             <div className="mx-auto max-w-3xl px-6 py-6">
-              <ChatThread state={state} />
+              <ChatThread state={state} onOpenSources={openSources} />
             </div>
           ) : (
             <EmptyState
@@ -174,6 +187,33 @@ export default function Home() {
             </div>
           </form>
         )}
+        {/* Left-edge toggle for the Sources & Relations tree */}
+        {hasMessages && !sourcesOpen && (
+          <button
+            type="button"
+            onClick={() => {
+              setSourcesMsg(latestAnswer);
+              setSourcesOpen(true);
+            }}
+            className="group absolute left-0 top-1/2 z-20 flex -translate-y-1/2 items-center gap-1.5 rounded-r-xl border border-l-0 border-[color:var(--line)] bg-[color:var(--bg-2)]/85 py-3 pl-1.5 pr-2 text-[color:var(--fg-3)] backdrop-blur-md transition-colors hover:text-[color:var(--accent)] cursor-pointer"
+            title="Sources & Relations"
+            aria-label="Open sources and relations panel"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+            <span className="font-mono text-[9px] uppercase tracking-[0.18em] [writing-mode:vertical-rl]">
+              Sources
+            </span>
+          </button>
+        )}
+
+        {/* Sources & Relations slide-in panel */}
+        <SourcesPanel
+          message={sourcesMsg}
+          open={sourcesOpen}
+          onClose={() => setSourcesOpen(false)}
+        />
       </section>
 
       {/* ── Knowledge-graph column ──────────────────────────── */}

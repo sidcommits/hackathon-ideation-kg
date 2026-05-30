@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useRef, useState, Component, ErrorInfo, Reac
 import dynamic from "next/dynamic";
 import type { GraphState } from "@/lib/chatReducer";
 
-const ForceGraph2D = dynamic(() => import("react-force-graph-2d"), { ssr: false });
+const ForceGraph3D = dynamic(() => import("react-force-graph-3d"), { ssr: false });
 
 interface ErrorBoundaryProps {
   children?: ReactNode;
@@ -146,7 +146,40 @@ export function GraphCanvas({ graph }: { graph: GraphState }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const fgRef = useRef<any>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
-  const [hoveredNode, setHoveredNode] = useState<any | null>(null);
+
+  // ── FOCUS HIGHLIGHT (remove this block + accessors/handlers below to reverse) ──
+  // Click a node → it, its edges, and its direct (1-hop) neighbours light up;
+  // everything else stays greyed out. Click background → reset to all-grey.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // node id → set of neighbour node ids (1 hop)
+  const adjacency = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const e of graph.edges) {
+      if (!m.has(e.from)) m.set(e.from, new Set());
+      if (!m.has(e.to)) m.set(e.to, new Set());
+      m.get(e.from)!.add(e.to);
+      m.get(e.to)!.add(e.from);
+    }
+    return m;
+  }, [graph.edges]);
+
+  const isLitNode = (id: string) =>
+    selectedId === id || (selectedId !== null && (adjacency.get(selectedId)?.has(id) ?? false));
+
+  // An edge is lit only if it touches the selected node.
+  const isLitLink = (l: any) => {
+    if (!selectedId) return false;
+    const s = typeof l.source === "object" ? l.source.id : l.source;
+    const t = typeof l.target === "object" ? l.target.id : l.target;
+    return s === selectedId || t === selectedId;
+  };
+
+  // Force a repaint when selection changes (accessor outputs are cached).
+  useEffect(() => {
+    fgRef.current?.refresh?.();
+  }, [selectedId]);
+  // ── END FOCUS HIGHLIGHT ──
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -159,24 +192,36 @@ export function GraphCanvas({ graph }: { graph: GraphState }) {
     return () => ro.disconnect();
   }, []);
 
-  // Dynamically configure D3 forces and auto-fit graph to look spacious and stunning
+  // ── ZOOM CONTROLS (remove this block + the buttons JSX below to reverse) ──
+  // Dolly the camera along its current view direction. factor < 1 = zoom in.
+  const zoomBy = (factor: number) => {
+    const fg = fgRef.current;
+    if (!fg) return;
+    const cam = fg.camera();
+    const dist = Math.hypot(cam.position.x, cam.position.y, cam.position.z) || 1;
+    const next = Math.max(40, Math.min(2000, dist * factor));
+    const k = next / dist;
+    fg.cameraPosition(
+      { x: cam.position.x * k, y: cam.position.y * k, z: cam.position.z * k },
+      undefined,
+      250,
+    );
+  };
+  const resetView = () => fgRef.current?.zoomToFit(500, 60);
+  // ── END ZOOM CONTROLS ──
+
+  // Tune the 3D force layout and auto-frame the camera around the cluster.
   useEffect(() => {
     if (fgRef.current && !empty) {
-      fgRef.current.d3Force("charge").strength(-10);
-      fgRef.current.d3Force("link").distance(15);
+      fgRef.current.d3Force("charge")?.strength(-60);
+      fgRef.current.d3Force("link")?.distance(34);
 
-      // Strengthen the center force to pull all nodes into one tight cluster
-      const centerForce = fgRef.current.d3Force("center");
-      if (centerForce) {
-        centerForce.strength(1.2);
-      }
-
-      // Auto-fit camera to contain all nodes with a smooth animation and padding
+      // Auto-fit camera to contain all nodes with a smooth animation and padding.
       setTimeout(() => {
         if (fgRef.current) {
-          fgRef.current.zoomToFit(800, 45);
+          fgRef.current.zoomToFit(800, 60);
         }
-      }, 150);
+      }, 400);
     }
   }, [data, empty]);
 
@@ -210,6 +255,39 @@ export function GraphCanvas({ graph }: { graph: GraphState }) {
         ))}
       </div>
 
+      {/* ── ZOOM CONTROLS (delete this block to reverse) ── */}
+      {!empty && (
+        <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-1.5">
+          {[
+            { label: "Zoom in", sym: "+", onClick: () => zoomBy(0.6) },
+            { label: "Zoom out", sym: "−", onClick: () => zoomBy(1.6) },
+          ].map((b) => (
+            <button
+              key={b.label}
+              type="button"
+              onClick={b.onClick}
+              aria-label={b.label}
+              title={b.label}
+              className="grid h-9 w-9 place-items-center rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-2)]/80 text-[18px] font-medium leading-none text-[color:var(--fg-2)] backdrop-blur-md transition-colors hover:border-[color:var(--accent-dim)] hover:text-[color:var(--fg)] cursor-pointer"
+            >
+              {b.sym}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={resetView}
+            aria-label="Fit to view"
+            title="Fit to view"
+            className="grid h-9 w-9 place-items-center rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-2)]/80 text-[color:var(--fg-2)] backdrop-blur-md transition-colors hover:border-[color:var(--accent-dim)] hover:text-[color:var(--fg)] cursor-pointer"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4" />
+            </svg>
+          </button>
+        </div>
+      )}
+      {/* ── END ZOOM CONTROLS ── */}
+
       {/* Empty state */}
       {empty && (
         <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center px-8 text-center">
@@ -222,90 +300,45 @@ export function GraphCanvas({ graph }: { graph: GraphState }) {
 
       {size.w > 0 && (
         <ErrorBoundary fallback={<GraphFallback graph={graph} />}>
-          <ForceGraph2D
+          <ForceGraph3D
             ref={fgRef}
             graphData={data}
             width={size.w}
             height={size.h}
             backgroundColor="rgba(0,0,0,0)"
-            nodeRelSize={5}
-            linkColor={() => "rgba(148,163,184,0.18)"}
-            linkWidth={0.8}
-            linkDirectionalParticles={2}
-            linkDirectionalParticleSpeed={0.015}
-            linkDirectionalParticleWidth={2}
-            linkDirectionalParticleColor={() => "rgba(56,224,200,0.75)"}
-            onNodeHover={(node) => setHoveredNode(node)}
-            nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D, scale: number) => {
-              // Coordinates are undefined on the first tick before the force
-              // simulation positions nodes — bail to avoid non-finite canvas ops.
-              if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) return;
+            showNavInfo={false}
+            nodeRelSize={4}
+            // FOCUS HIGHLIGHT: grey unless lit (selected node or a 1-hop neighbour).
+            nodeColor={(node: any) =>
+              isLitNode(node.id) ? (COLOR[node.label] ?? "#94A3B8") : "#3A4150"
+            }
+            nodeOpacity={0.95}
+            nodeResolution={16}
+            nodeVal={(node: any) =>
+              pulsed.has(node.id) || node.id === selectedId ? 8 : 2
+            }
+            onNodeClick={(node: any) =>
+              setSelectedId((cur) => (cur === node.id ? null : node.id))
+            }
+            onBackgroundClick={() => setSelectedId(null)}
+            nodeLabel={(node: any) => {
               const color = COLOR[node.label] ?? "#94A3B8";
-              const isPulsed = pulsed.has(node.id);
-              const r = isPulsed ? 6 : 4;
-
-              // synapse pulse — soft halo on newly-traversed nodes
-              if (isPulsed) {
-                const grad = ctx.createRadialGradient(
-                  node.x,
-                  node.y,
-                  0,
-                  node.x,
-                  node.y,
-                  r + 9,
-                );
-                grad.addColorStop(0, color + "55");
-                grad.addColorStop(1, color + "00");
-                ctx.beginPath();
-                ctx.arc(node.x, node.y, r + 9, 0, 2 * Math.PI);
-                ctx.fillStyle = grad;
-                ctx.fill();
-              }
-
-              // node core with subtle ring
-              ctx.beginPath();
-              ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
-              ctx.fillStyle = color;
-              ctx.fill();
-              ctx.lineWidth = 1 / scale;
-              ctx.strokeStyle = "rgba(10,11,13,0.9)";
-              ctx.stroke();
-
-              // Render node labels only on hover for clean visual aesthetics
-              const isHovered = hoveredNode && hoveredNode.id === node.id;
-              if (isHovered) {
-                const text = node.name;
-                ctx.font = `600 ${11 / scale}px ui-sans-serif, system-ui, sans-serif`;
-
-                // Measure text to draw an elegant backdrop card
-                const textWidth = ctx.measureText(text).width;
-                const padX = 6 / scale;
-                const padY = 3.5 / scale;
-                const rectW = textWidth + padX * 2;
-                const rectH = 15 / scale;
-                const rectX = node.x + r + 3;
-                const rectY = node.y - rectH / 2;
-
-                // Draw rounded rect backdrop
-                ctx.fillStyle = "rgba(10,11,13,0.92)";
-                ctx.beginPath();
-                if (typeof (ctx as any).roundRect === "function") {
-                  (ctx as any).roundRect(rectX, rectY, rectW, rectH, 3 / scale);
-                } else {
-                  ctx.rect(rectX, rectY, rectW, rectH);
-                }
-                ctx.fill();
-
-                // Draw subtle neon accent border matching the node color
-                ctx.strokeStyle = color + "aa";
-                ctx.lineWidth = 1 / scale;
-                ctx.stroke();
-
-                // Draw sharp, highly visible white text inside
-                ctx.fillStyle = "#FFFFFF";
-                ctx.fillText(text, rectX + padX, rectY + rectH - padY - 0.5);
-              }
+              return `<div style="
+                font:600 11px ui-sans-serif,system-ui,sans-serif;
+                color:#fff;background:rgba(10,11,13,0.92);
+                border:1px solid ${color}aa;border-radius:4px;
+                padding:3px 7px;white-space:nowrap;">${node.name}</div>`;
             }}
+            // FOCUS HIGHLIGHT: lit edges glow accent; the rest are faint grey.
+            linkColor={(l: any) =>
+              isLitLink(l) ? "rgba(56,224,200,0.85)" : "rgba(148,163,184,0.10)"
+            }
+            linkWidth={(l: any) => (isLitLink(l) ? 1.6 : 0.6)}
+            linkOpacity={0.5}
+            linkDirectionalParticles={(l: any) => (isLitLink(l) ? 3 : 0)}
+            linkDirectionalParticleSpeed={0.012}
+            linkDirectionalParticleWidth={1.8}
+            linkDirectionalParticleColor={() => "rgba(56,224,200,0.85)"}
           />
         </ErrorBoundary>
       )}

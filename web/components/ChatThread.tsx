@@ -1,8 +1,15 @@
-import type { ChatState } from "@/lib/chatReducer";
+import type { ChatState, Message } from "@/lib/chatReducer";
 import { MessageBubble } from "@/components/MessageBubble";
 import { ToolCallCard } from "@/components/ToolCallCard";
+import { DummyConnectors } from "@/components/DummyConnectors"; // DEMO-ONLY (remove to reverse)
 
-export function ChatThread({ state }: { state: ChatState }) {
+export function ChatThread({
+  state,
+  onOpenSources,
+}: {
+  state: ChatState;
+  onOpenSources?: (m: Message) => void;
+}) {
   const lastIdx = state.messages.length - 1;
 
   return (
@@ -34,10 +41,16 @@ export function ChatThread({ state }: { state: ChatState }) {
                 {state.activeToolCalls.map((c) => (
                   <ToolCallCard key={c.id} card={c} />
                 ))}
+                {/* DEMO-ONLY: mock future connectors. Remove this line to reverse. */}
+                <DummyConnectors />
               </div>
             )}
 
-            <MessageBubble m={m} streaming={m.role === "assistant" && isLast} />
+            <MessageBubble
+              m={m}
+              streaming={m.role === "assistant" && isLast}
+              onOpenSources={onOpenSources}
+            />
           </div>
         );
       })}

@@ -1,7 +1,14 @@
 import type { ChatEvent, GraphNode, GraphEdge } from "@/lib/events";
 
 export type Citation = { doc_title: string; sensitivity: string; chunk_text: string };
-export type Message = { role: "user" | "assistant"; text: string; citations?: Citation[] };
+// Per-answer subgraph: the nodes/edges THIS answer traversed (for the Sources panel).
+export type MessageSubgraph = { nodes: GraphNode[]; edges: GraphEdge[] };
+export type Message = {
+  role: "user" | "assistant";
+  text: string;
+  citations?: Citation[];
+  subgraph?: MessageSubgraph;
+};
 export type ToolCard = {
   id: string; name: string; args: Record<string, unknown>;
   status: "running" | "done"; summary?: string;
@@ -78,9 +85,27 @@ export function reduce(state: ChatState, event: ChatEvent): ChatState {
       const edgeKey = (e: GraphEdge) => `${e.from}|${e.rel}|${e.to}`;
       const edgeSet = new Map(state.graph.edges.map((e) => [edgeKey(e), e]));
       for (const e of event.graph_delta.edges) edgeSet.set(edgeKey(e), e);
+
+      // Also accumulate this delta onto the current answer's own subgraph so the
+      // Sources & Relations panel can show what THIS answer traversed.
+      const messages = ensureAssistant(state.messages);
+      const idx = messages.length - 1;
+      const cur = messages[idx];
+      const subNodeById = new Map((cur.subgraph?.nodes ?? []).map((n) => [n.id, n]));
+      for (const n of event.graph_delta.nodes) subNodeById.set(n.id, n);
+      const subEdgeSet = new Map(
+        (cur.subgraph?.edges ?? []).map((e) => [edgeKey(e), e]),
+      );
+      for (const e of event.graph_delta.edges) subEdgeSet.set(edgeKey(e), e);
+      const updatedMsg: Message = {
+        ...cur,
+        subgraph: { nodes: [...subNodeById.values()], edges: [...subEdgeSet.values()] },
+      };
+
       return {
         ...state,
         activeToolCalls,
+        messages: [...messages.slice(0, idx), updatedMsg],
         graph: {
           nodes: [...byId.values()],
           edges: [...edgeSet.values()],
