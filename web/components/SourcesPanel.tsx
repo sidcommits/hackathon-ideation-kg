@@ -60,11 +60,10 @@ function SensitivityDot({ sensitivity }: { sensitivity: string }) {
 
 /* Icon glyph + colour per provenance tree node kind. */
 function NodeGlyph({ kind, label }: { kind: TreeNode["kind"]; label: string }) {
-  const ROOT_COLOR = "#C084FC"; // provenance purple
   if (kind === "root") {
     const isGit = /github|git/i.test(label);
     return (
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0" style={{ color: ROOT_COLOR }}>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 text-[color:var(--node-provenance)]">
         {isGit ? (
           <path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.36 1.09 2.94.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.5 9.5 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.69-4.57 4.94.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2Z" fill="currentColor" />
         ) : (
@@ -113,8 +112,8 @@ function SourcesTree({ message }: { message: Message }) {
 
   const ROW_PAD = [0, 14, 28, 42];
 
-  const renderNode = (node: TreeNode, depth: number, keyPrefix: string) => {
-    const key = `${keyPrefix}/${node.label}`;
+  const renderNode = (node: TreeNode, depth: number, keyPrefix: string, idx = 0) => {
+    const key = `${keyPrefix}/${idx}-${node.label}`;
     const isOpen = open.has(key);
     const hasChildren = node.children.length > 0;
     const pad = ROW_PAD[Math.min(depth, ROW_PAD.length - 1)];
@@ -165,7 +164,7 @@ function SourcesTree({ message }: { message: Message }) {
           )}
           {isDoc && node.meta?.sensitivity && <SensitivityDot sensitivity={node.meta.sensitivity} />}
         </button>
-        {isOpen && hasChildren && <div>{node.children.map((c) => renderNode(c, depth + 1, key))}</div>}
+        {isOpen && hasChildren && <div>{node.children.map((c, i) => renderNode(c, depth + 1, key, i))}</div>}
       </div>
     );
   };
@@ -196,7 +195,7 @@ function SourcesTree({ message }: { message: Message }) {
 
       {/* Nested tree */}
       <div className="flex flex-col">
-        {tree.map((root) => renderNode(root, 0, "root"))}
+        {tree.map((root, i) => renderNode(root, 0, "root", i))}
       </div>
     </div>
   );
