@@ -20,7 +20,7 @@ export function ChatThread({
         return (
           <div key={i} className="msg-in flex flex-col gap-2">
             <div
-              className={`flex items-center gap-2 text-[10px] font-medium uppercase tracking-[0.16em] text-[color:var(--fg-3)] ${
+              className={`flex items-center gap-2 text-[length:var(--text-xs)] font-medium uppercase tracking-[0.16em] text-[color:var(--fg-3)] ${
                 isUser ? "justify-end pr-1" : "pl-1"
               }`}
             >

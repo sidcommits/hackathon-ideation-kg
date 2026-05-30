@@ -135,7 +135,7 @@ export function AvatarStage({ url, token, onDisconnect, isSpeaking }: AvatarStag
         {loading ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-[color:var(--bg)] p-6 text-center">
             <div className="relative h-12 w-12 animate-spin rounded-full border-2 border-[color:var(--line-2)] border-t-[color:var(--accent)]" />
-            <p className="mt-4 font-mono text-[11px] uppercase tracking-wider text-[color:var(--fg-2)]">
+            <p className="mt-4 font-mono text-[length:var(--text-sm)] uppercase tracking-wider text-[color:var(--fg-2)]">
               {status}
             </p>
           </div>
@@ -160,7 +160,7 @@ export function AvatarStage({ url, token, onDisconnect, isSpeaking }: AvatarStag
               muted
               className="h-full w-full object-cover scale-x-[-1]"
             />
-            <div className="absolute bottom-1.5 left-2 rounded bg-black/60 px-1 py-0.5 text-[8.5px] uppercase font-bold tracking-wider text-white">
+            <div className="absolute bottom-1.5 left-2 rounded bg-black/60 px-1 py-0.5 text-[length:var(--text-2xs)] uppercase font-bold tracking-wider text-white">
               You
             </div>
           </div>
@@ -173,7 +173,7 @@ export function AvatarStage({ url, token, onDisconnect, isSpeaking }: AvatarStag
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500"></span>
             </span>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-violet-400">
+            <span className="text-[length:var(--text-xs)] font-bold uppercase tracking-wider text-violet-400">
               Advisor Speaking
             </span>
           </div>
