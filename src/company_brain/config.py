@@ -16,6 +16,9 @@ class Settings:
     extraction_model: str
     embedder: str
     embedding_model: str
+    openai_api_key: str
+    openai_base_url: str
+    embedding_dim: int
     chunk_max_chars: int
     chunk_overlap_chars: int
     max_pdf_pages: int
@@ -31,6 +34,9 @@ def get_settings() -> Settings:
         extraction_model=os.getenv("EXTRACTION_MODEL", "claude-sonnet-4-6"),
         embedder=os.getenv("EMBEDDER", "local"),
         embedding_model=os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5"),
+        openai_api_key=os.getenv("OPENAI_API_KEY", ""),
+        openai_base_url=os.getenv("OPENAI_BASE_URL", ""),
+        embedding_dim=int(os.getenv("EMBEDDING_DIM", "0")),
         chunk_max_chars=int(os.getenv("CHUNK_MAX_CHARS", "2000")),
         chunk_overlap_chars=int(os.getenv("CHUNK_OVERLAP_CHARS", "200")),
         max_pdf_pages=int(os.getenv("MAX_PDF_PAGES", "0")),

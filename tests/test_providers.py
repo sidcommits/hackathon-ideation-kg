@@ -63,13 +63,54 @@ def test_get_embedder_local(monkeypatch):
     assert len(vecs) == 2 and e.dim == 3
 
 
-def test_get_embedder_stub_raises(monkeypatch):
+class _FakeEmbItem:
+    def __init__(self, vec):
+        self.embedding = vec
+
+
+class _FakeEmbResp:
+    def __init__(self, n, size=1536):
+        self.data = [_FakeEmbItem([0.0] * size) for _ in range(n)]
+
+
+class _FakeOpenAI:
+    last_kwargs = None
+
+    def __init__(self, *a, **k):
+        self.embeddings = self
+
+    def create(self, **kwargs):
+        _FakeOpenAI.last_kwargs = kwargs
+        size = kwargs.get("dimensions", 1536)
+        return _FakeEmbResp(len(kwargs["input"]), size)
+
+
+def test_get_embedder_openai(monkeypatch):
     import company_brain.providers.embedder as emb
     from company_brain.config import get_settings
-    import pytest
+
     monkeypatch.setenv("EMBEDDER", "openai")
-    with pytest.raises(NotImplementedError):
-        emb.get_embedder(get_settings())
+    monkeypatch.setenv("EMBEDDING_MODEL", "text-embedding-3-small")
+    monkeypatch.setenv("OPENAI_API_KEY", "x")
+    monkeypatch.delenv("EMBEDDING_DIM", raising=False)
+    monkeypatch.setattr(emb, "_make_openai_client", lambda api_key, base_url: _FakeOpenAI())
+
+    e = emb.get_embedder(get_settings())
+    vecs = e.embed(["a", "b"])
+    assert len(vecs) == 2
+    assert e.dim == 1536                       # native dim for text-embedding-3-small
+    assert _FakeOpenAI.last_kwargs["model"] == "text-embedding-3-small"
+    assert "dimensions" not in _FakeOpenAI.last_kwargs   # no override → don't send it
+
+
+def test_openai_embedder_dimensions_override(monkeypatch):
+    import company_brain.providers.embedder as emb
+    monkeypatch.setattr(emb, "_make_openai_client", lambda api_key, base_url: _FakeOpenAI())
+    e = emb.OpenAIEmbedder("text-embedding-3-small", "x", dimensions=256)
+    vecs = e.embed(["hi"])
+    assert e.dim == 256                        # reported dim matches the override
+    assert len(vecs[0]) == 256
+    assert _FakeOpenAI.last_kwargs["dimensions"] == 256   # override passed to the API
 
 
 import pytest
@@ -81,3 +122,15 @@ def test_local_embedder_real_dim():
     e = LocalEmbedder("BAAI/bge-small-en-v1.5")
     v = e.embed(["MiFIR reporting"])
     assert len(v) == 1 and len(v[0]) == e.dim == 384
+
+
+@pytest.mark.integration
+def test_openai_embedder_real_dim():
+    import os
+    if not os.getenv("OPENAI_API_KEY"):
+        pytest.skip("OPENAI_API_KEY not set")
+    from company_brain.providers.embedder import OpenAIEmbedder
+    e = OpenAIEmbedder("text-embedding-3-small", os.getenv("OPENAI_API_KEY"),
+                       base_url=os.getenv("OPENAI_BASE_URL", ""))
+    v = e.embed(["MiFIR reporting"])
+    assert len(v) == 1 and len(v[0]) == e.dim == 1536
