@@ -62,6 +62,37 @@ class GraphStore:
             ordinal=chunk.ordinal, embedding=chunk.embedding,
         )
 
+    def mark_extracted(self, chunk_id: str) -> None:
+        """Checkpoint: mark a chunk done AFTER its extraction is written.
+
+        Set only on success, so a chunk whose extraction failed stays pending
+        and is retried on the next (resumed) run.
+        """
+        self.run("MATCH (c:Chunk {chunk_id: $chunk_id}) SET c.extracted = true",
+                 chunk_id=chunk_id)
+
+    def pending_chunks(self, chunks) -> list[str]:
+        """Return the chunk_ids that still need embedding + extraction (resume support).
+
+        A chunk is DONE when a node with the same chunk_id exists, is marked
+        `extracted`, AND its stored text matches (so edited source text re-processes).
+        Everything else is pending. Input order is preserved.
+        """
+        items = [{"chunk_id": c.chunk_id, "text": c.text} for c in chunks]
+        done = {
+            r["chunk_id"]
+            for r in self.run(
+                """
+                UNWIND $items AS it
+                MATCH (c:Chunk {chunk_id: it.chunk_id})
+                WHERE coalesce(c.extracted, false) = true AND c.text = it.text
+                RETURN c.chunk_id AS chunk_id
+                """,
+                items=items,
+            )
+        }
+        return [c.chunk_id for c in chunks if c.chunk_id not in done]
+
     _NODE_LABELS = {"Regulation", "DataAttribute", "InstrumentType", "Obligation", "Concept"}
 
     def merge_extraction(self, extraction: dict, chunk_id: str) -> None:
@@ -71,7 +102,9 @@ class GraphStore:
         nodes instead of duplicating. Relationships and insights link to those nodes;
         every entity/insight gets provenance to the source chunk.
         """
-        for ent in extraction.get("entities", []):
+        for ent in extraction.get("entities") or []:
+            if not isinstance(ent, dict):
+                continue                      # LLM occasionally emits a bare string; skip it
             label = ent.get("type")
             name = ent.get("name")
             if label not in self._NODE_LABELS or not name:
@@ -86,11 +119,15 @@ class GraphStore:
                 chunk_id=chunk_id, name=name, aliases=ent.get("aliases"),
             )
 
-        for rel in extraction.get("relationships", []):
+        for rel in extraction.get("relationships") or []:
+            if not isinstance(rel, dict):
+                continue
             st, sn = rel.get("source_type"), rel.get("source_name")
             tt, tn = rel.get("target_type"), rel.get("target_name")
             r = rel.get("rel")
             if st not in self._NODE_LABELS or tt not in self._NODE_LABELS:
+                continue
+            if not sn or not tn:                 # null/empty endpoint name → would break MERGE
                 continue
             if r not in {"REQUIRES", "APPLIES_TO", "GOVERNS", "DEFINES", "RELATED_TO"}:
                 continue
@@ -103,7 +140,9 @@ class GraphStore:
                 sn=sn, tn=tn,
             )
 
-        for idx, ins in enumerate(extraction.get("insights", [])):
+        for idx, ins in enumerate(extraction.get("insights") or []):
+            if not isinstance(ins, dict):
+                continue
             text = ins.get("text")
             if not text:
                 continue
@@ -118,7 +157,9 @@ class GraphStore:
                 chunk_id=chunk_id, insight_id=insight_id, text=text,
                 role=ins.get("role", "unknown"),
             )
-            for about in ins.get("about", []):
+            for about in ins.get("about") or []:
+                if not isinstance(about, dict):
+                    continue
                 lbl, nm = about.get("type"), about.get("name")
                 if lbl not in self._NODE_LABELS or not nm:
                     continue

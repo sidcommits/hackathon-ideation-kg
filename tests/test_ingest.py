@@ -10,6 +10,7 @@ def store():
     s = get_settings()
     gs = GraphStore(s.neo4j_uri, s.neo4j_user, s.neo4j_password)
     gs.run("MATCH (n) DETACH DELETE n")
+    gs.run("DROP INDEX chunk_vec IF EXISTS")  # avoid dim clash with a leftover index
     gs.ensure_schema(embedding_dim=8)
     yield gs
     gs.close()
@@ -63,3 +64,47 @@ def test_bad_file_does_not_abort_run(tmp_path, store, fake_provider, fake_embedd
                           embedder=fake_embedder(), settings=get_settings())
     assert summary["errors"] == 1          # the bad pdf was caught
     assert summary["structured"] == 1      # the good xlsx still processed
+
+
+class _CountingProvider:
+    def __init__(self):
+        self.calls = 0
+
+    def extract(self, system, text, schema):
+        self.calls += 1
+        return {"entities": [], "relationships": [], "insights": []}
+
+
+class _CountingEmbedder:
+    dim = 8
+
+    def __init__(self):
+        self.calls = 0
+
+    def embed(self, texts):
+        self.calls += 1
+        return [[0.0] * 8 for _ in texts]
+
+
+@requires_neo4j
+def test_ingest_resumes_and_skips_done_chunks(tmp_path, store, monkeypatch):
+    import company_brain.loaders.unstructured as u
+
+    class _R:
+        text_content = ("Paragraph one about structured notes. " * 40 +
+                        "\n\nParagraph two about ESG attributes. " * 40)
+    monkeypatch.setattr(u, "_convert", lambda path: _R())
+    pdf = tmp_path / "EU_MIFID_doc.pdf"; pdf.write_bytes(b"%PDF-1.5 fake")
+
+    prov, emb = _CountingProvider(), _CountingEmbedder()
+
+    # First run: extracts every chunk.
+    ingest_path(str(tmp_path), store=store, provider=prov, embedder=emb, settings=get_settings())
+    first_calls = prov.calls
+    first_embeds = emb.calls
+    assert first_calls > 1            # multiple chunks were extracted
+
+    # Second run over the same (unchanged) files: everything is checkpointed → no work.
+    ingest_path(str(tmp_path), store=store, provider=prov, embedder=emb, settings=get_settings())
+    assert prov.calls == first_calls  # zero re-extraction
+    assert emb.calls == first_embeds  # zero re-embedding

@@ -10,6 +10,7 @@ def store():
     s = get_settings()
     gs = GraphStore(s.neo4j_uri, s.neo4j_user, s.neo4j_password)
     gs.run("MATCH (n) DETACH DELETE n")     # clean slate
+    gs.run("DROP INDEX chunk_vec IF EXISTS")  # avoid dim clash with a leftover index
     gs.ensure_schema(embedding_dim=8)
     yield gs
     gs.close()
@@ -85,3 +86,43 @@ def test_merge_extraction_is_idempotent_for_insights(store):
     assert n == 1
     about = store.run("MATCH (:Insight {insight_id:'d3::0::ins::0'})-[:ABOUT]->(:Concept {name:'coverage'}) RETURN count(*) AS c")[0]["c"]
     assert about == 1
+
+
+@requires_neo4j
+def test_merge_extraction_tolerates_malformed_items(store):
+    store.upsert_document(Document(doc_id="d4", source_path="p", source_type="pdf",
+                                   title="t", domain="g", sensitivity="C2 Internal"))
+    store.upsert_chunk(Chunk(chunk_id="d4::0", doc_id="d4", text="x", ordinal=0, embedding=[0.0] * 8))
+    # The LLM occasionally emits bare strings instead of objects — must not crash.
+    bad = {
+        "entities": ["just a string", {"type": "Concept", "name": "FATCA"}],
+        "relationships": ["nope"],
+        "insights": ["bad",
+                     {"text": "ok insight", "role": "Officer",
+                      "about": ["bareword", {"type": "Concept", "name": "FATCA"}]}],
+    }
+    store.merge_extraction(bad, chunk_id="d4::0")          # must not raise
+    assert store.run("MATCH (:Concept {name:'FATCA'}) RETURN count(*) AS c")[0]["c"] == 1
+    assert store.run("MATCH (i:Insight {insight_id:'d4::0::ins::1'}) RETURN count(i) AS c")[0]["c"] == 1
+
+
+@requires_neo4j
+def test_pending_chunks_and_mark_extracted(store):
+    store.upsert_document(Document(doc_id="rd", source_path="p", source_type="pdf",
+                                   title="t", domain="g", sensitivity="C2 Internal"))
+    chunks = [Chunk(chunk_id=f"rd::{i}", doc_id="rd", text=f"text {i}", ordinal=i,
+                    embedding=[0.0] * 8) for i in range(3)]
+    for c in chunks:
+        store.upsert_chunk(c)
+
+    # Nothing checkpointed yet → all pending, order preserved.
+    assert store.pending_chunks(chunks) == ["rd::0", "rd::1", "rd::2"]
+
+    store.mark_extracted("rd::0")
+    store.mark_extracted("rd::1")
+    assert store.pending_chunks(chunks) == ["rd::2"]        # done ones skipped
+
+    # Edited text re-opens a previously-done chunk. pending_chunks runs BEFORE the
+    # re-upsert (as in the ingest flow), so it compares new text vs the stored text.
+    chunks[1].text = "EDITED"
+    assert set(store.pending_chunks(chunks)) == {"rd::1", "rd::2"}

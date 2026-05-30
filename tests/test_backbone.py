@@ -10,6 +10,7 @@ def store():
     s = get_settings()
     gs = GraphStore(s.neo4j_uri, s.neo4j_user, s.neo4j_password)
     gs.run("MATCH (n) DETACH DELETE n")
+    gs.run("DROP INDEX chunk_vec IF EXISTS")  # avoid dim clash with a leftover index
     gs.ensure_schema(embedding_dim=8)
     yield gs
     gs.close()

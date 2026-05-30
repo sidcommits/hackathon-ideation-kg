@@ -40,15 +40,29 @@ def ingest_path(root: str, *, store, provider, embedder, settings) -> dict:
                 doc.markdown = anonymize(doc.markdown or "")
                 store.upsert_document(doc)
                 chunks = chunk_markdown(doc, settings.chunk_max_chars, settings.chunk_overlap_chars)
+                processed = resumed = 0
                 if chunks:
-                    vecs = embedder.embed([c.text for c in chunks])
-                    for c, v in zip(chunks, vecs):
-                        c.embedding = v
-                        store.upsert_chunk(c)
-                    for c in chunks:
-                        store.merge_extraction(extract_entities(c.text, provider), chunk_id=c.chunk_id)
+                    # Resume: only embed + extract chunks not already checkpointed.
+                    pending_ids = set(store.pending_chunks(chunks))
+                    pending = [c for c in chunks if c.chunk_id in pending_ids]
+                    resumed = len(chunks) - len(pending)
+                    processed = len(pending)
+                    if pending:
+                        vecs = embedder.embed([c.text for c in pending])
+                        for c, v in zip(pending, vecs):
+                            c.embedding = v
+                            store.upsert_chunk(c)
+                        for c in pending:
+                            try:
+                                store.merge_extraction(extract_entities(c.text, provider), chunk_id=c.chunk_id)
+                                store.mark_extracted(c.chunk_id)   # checkpoint on success only
+                            except Exception:
+                                # One malformed chunk shouldn't discard the whole document's work;
+                                # leaving it un-checkpointed means it retries on the next run.
+                                logger.exception("extraction failed for chunk %s", c.chunk_id)
                 summary["unstructured"] += 1
-                logger.info("unstructured: %s (%d chunks)", path.name, len(chunks))
+                logger.info("unstructured: %s (%d chunks: %d processed, %d resumed/skipped)",
+                            path.name, len(chunks), processed, resumed)
 
             else:
                 summary["skipped"] += 1
