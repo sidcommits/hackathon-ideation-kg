@@ -36,6 +36,16 @@ export function appendUser(state: ChatState, text: string): ChatState {
 
 export function reduce(state: ChatState, event: ChatEvent): ChatState {
   switch (event.type) {
+    case "init_graph":
+      return {
+        ...state,
+        graph: {
+          nodes: event.graph.nodes,
+          edges: event.graph.edges,
+          pulsedIds: [],
+        },
+      };
+
     case "message_start":
       return { ...state, messages: ensureAssistant(state.messages) };
 

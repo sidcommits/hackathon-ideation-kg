@@ -3,10 +3,28 @@ import { useState } from "react";
 import { useChat } from "@/lib/useChat";
 import { ChatThread } from "@/components/ChatThread";
 import { GraphCanvas } from "@/components/GraphCanvas";
+import { ClearanceSelector } from "@/components/ClearanceSelector";
+import { AvatarStage } from "@/components/AvatarStage";
 
 export default function Home() {
-  const { state, busy, send } = useChat();
+  const {
+    state,
+    busy,
+    send,
+    clearance,
+    setClearance,
+    activeCall,
+    startCall,
+    endCall,
+    isSpeaking,
+    registerAgent,
+    isAgentRegistered,
+  } = useChat();
+
   const [input, setInput] = useState("");
+  const [showConfig, setShowConfig] = useState(false);
+  const [tunnelUrl, setTunnelUrl] = useState("");
+  const [registering, setRegistering] = useState(false);
   const hasMessages = state.messages.length > 0;
 
   const submit = (e: React.FormEvent) => {
@@ -37,47 +55,125 @@ export default function Home() {
               </div>
             </div>
           </div>
-          <StatusPill busy={busy} />
+          <div className="flex items-center gap-4 relative">
+            <ClearanceSelector
+              value={clearance}
+              onChange={setClearance}
+              disabled={busy || !!activeCall}
+            />
+            <StatusPill busy={busy} />
+            <button
+              onClick={() => setShowConfig(!showConfig)}
+              className="flex h-8 w-8 items-center justify-center rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-2)]/70 text-[color:var(--fg-2)] hover:text-[color:var(--fg)] hover:border-[color:var(--accent-dim)] transition-all cursor-pointer"
+              title="Beyond Presence Configuration"
+              aria-label="Beyond Presence Configuration"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </button>
+            {showConfig && (
+              <div className="absolute right-0 top-11 z-50 w-80 rounded-2xl border border-[color:var(--line)] bg-[color:var(--bg-2)]/95 p-4 shadow-2xl backdrop-blur-md">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[color:var(--fg)] mb-2.5">
+                  Advisor Integration Setup
+                </h3>
+                <p className="text-[11px] leading-normal text-[color:var(--fg-3)] mb-4">
+                  To connect the Beyond Presence digital avatar, provide your localtunnel or ngrok public URL.
+                </p>
+                <div className="flex flex-col gap-2.5">
+                  <div>
+                    <label htmlFor="tunnel-url-input" className="block text-[9.5px] uppercase tracking-wider font-semibold text-[color:var(--fg-3)] mb-1">
+                      Public Tunnel URL
+                    </label>
+                    <input
+                      id="tunnel-url-input"
+                      type="url"
+                      placeholder="https://xxxx.locallt.ly"
+                      value={tunnelUrl}
+                      onChange={(e) => setTunnelUrl(e.target.value)}
+                      className="w-full rounded-lg border border-[color:var(--line-2)] bg-[color:var(--bg)] px-3 py-1.5 text-xs text-[color:var(--fg)] placeholder:text-[color:var(--fg-3)] outline-none focus:border-[color:var(--accent)]"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!tunnelUrl.trim()) return alert("Please enter a valid URL");
+                      setRegistering(true);
+                      try {
+                        await registerAgent(tunnelUrl.trim());
+                        setShowConfig(false);
+                      } catch {}
+                      setRegistering(false);
+                    }}
+                    disabled={registering || !tunnelUrl.trim()}
+                    className="w-full rounded-xl bg-emerald-500 hover:bg-emerald-600 py-2 text-xs font-semibold text-black transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {registering ? "Registering..." : "Register & Provision Agent"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </header>
 
         <div className="relative flex-1 overflow-y-auto">
-          {hasMessages ? (
+          {activeCall ? (
+            <div className="flex flex-col h-full p-6 gap-6">
+              <div className="flex-1 min-h-[350px]">
+                <AvatarStage
+                  url={activeCall.livekitUrl}
+                  token={activeCall.livekitToken}
+                  onDisconnect={endCall}
+                  isSpeaking={isSpeaking}
+                />
+              </div>
+              <div className="h-[220px] overflow-y-auto border border-[color:var(--line)] rounded-2xl bg-[color:var(--bg-2)]/30 p-4">
+                <ChatThread state={state} />
+              </div>
+            </div>
+          ) : hasMessages ? (
             <div className="mx-auto max-w-3xl px-6 py-6">
               <ChatThread state={state} />
             </div>
           ) : (
-            <EmptyState onPick={(q) => void send(q)} busy={busy} />
+            <EmptyState
+              onPick={(q) => void send(q)}
+              busy={busy}
+              startCall={startCall}
+              isAgentRegistered={isAgentRegistered}
+              registerAgent={registerAgent}
+            />
           )}
         </div>
 
-        <form
-          onSubmit={submit}
-          className="border-t border-[color:var(--line)] bg-[color:var(--bg)]/60 px-6 py-4 backdrop-blur-sm"
-        >
-          <div className="mx-auto max-w-3xl">
-            <div className="input-focus glass flex items-center gap-3 rounded-2xl px-4 py-2.5 transition-colors">
-              <PromptGlyph />
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask the company brain…"
-                aria-label="Ask the company brain"
-                className="min-w-0 flex-1 bg-transparent py-1 text-[15px] text-[color:var(--fg)] placeholder:text-[color:var(--fg-3)] outline-none"
-              />
-              <button
-                type="submit"
-                disabled={busy || !input.trim()}
-                className="shrink-0 rounded-xl border border-[color:var(--line-2)] bg-[color:var(--bg-2)] px-3 py-1.5 text-xs font-medium text-[color:var(--fg-2)] transition-all hover:border-[color:var(--accent-dim)] hover:text-[color:var(--fg)] disabled:cursor-not-allowed disabled:opacity-40"
-                aria-label="Send"
-              >
-                <SendArrow />
-              </button>
+        {!activeCall && (
+          <form
+            onSubmit={submit}
+            className="border-t border-[color:var(--line)] bg-[color:var(--bg)]/60 px-6 py-4 backdrop-blur-sm"
+          >
+            <div className="mx-auto max-w-3xl">
+              <div className="input-focus glass flex items-center gap-3 rounded-2xl px-4 py-2.5 transition-colors">
+                <PromptGlyph />
+                <input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Ask the company brain…"
+                  aria-label="Ask the company brain"
+                  className="min-w-0 flex-1 bg-transparent py-1 text-[15px] text-[color:var(--fg)] placeholder:text-[color:var(--fg-3)] outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={busy || !input.trim()}
+                  className="shrink-0 rounded-xl border border-[color:var(--line-2)] bg-[color:var(--bg-2)] px-3 py-1.5 text-xs font-medium text-[color:var(--fg-2)] transition-all hover:border-[color:var(--accent-dim)] hover:text-[color:var(--fg)] disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="Send"
+                >
+                  <SendArrow />
+                </button>
+              </div>
+              <p className="mt-2 px-1 text-center text-[10.5px] text-[color:var(--fg-3)]">
+                Answers cite their source document, passage, and sensitivity label.
+              </p>
             </div>
-            <p className="mt-2 px-1 text-center text-[10.5px] text-[color:var(--fg-3)]">
-              Answers cite their source document, passage, and sensitivity label.
-            </p>
-          </div>
-        </form>
+          </form>
+        )}
       </section>
 
       {/* ── Knowledge-graph column ──────────────────────────── */}
@@ -160,13 +256,18 @@ const SUGGESTIONS = [
   "Is this instrument in scope for FATCA reporting?",
 ];
 
-function EmptyState({
-  onPick,
-  busy,
-}: {
+interface EmptyStateProps {
   onPick: (q: string) => void;
   busy: boolean;
-}) {
+  startCall: () => void;
+  isAgentRegistered: boolean;
+  registerAgent: (publicUrl: string) => Promise<any>;
+}
+
+function EmptyState({ onPick, busy, startCall, isAgentRegistered, registerAgent }: EmptyStateProps) {
+  const [tunnelInput, setTunnelInput] = useState("");
+  const [loading, setLoading] = useState(false);
+
   return (
     <div className="hero-rise flex h-full flex-col items-center justify-center px-6 text-center">
       <div className="relative mb-6 grid h-16 w-16 place-items-center rounded-2xl border border-[color:var(--line-2)] bg-[color:var(--bg-2)]">
@@ -192,6 +293,77 @@ function EmptyState({
         MiFID&nbsp;II, SFDR, FATCA — synthesised from source documents and SME
         interviews, with every answer traced back to its citation.
       </p>
+
+      {isAgentRegistered ? (
+        <div className="mt-6 flex flex-col items-center">
+          {/* Real-time Video Advisor trigger */}
+          <button
+            type="button"
+            onClick={startCall}
+            disabled={busy}
+            className="flex items-center gap-2.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-5 py-3 text-xs font-bold uppercase tracking-wider text-emerald-400 hover:bg-emerald-500/20 shadow-lg shadow-emerald-500/5 transition-all animate-pulse cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <line x1="12" x2="12" y1="19" y2="22" />
+            </svg>
+            Talk to Video Advisor
+          </button>
+          <div className="mt-2.5 flex items-center gap-1.5 text-[10px] text-emerald-400 bg-emerald-500/5 border border-emerald-500/10 rounded-full px-2.5 py-0.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+            <span>Digital Human Advisor Ready</span>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-6 w-full max-w-sm rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 text-left backdrop-blur-sm">
+          <div className="flex items-center gap-2.5 mb-2">
+            <span className="flex h-2 w-2 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+            </span>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400">
+              Advisor Connection Required
+            </h3>
+          </div>
+          <p className="text-[11px] leading-normal text-[color:var(--fg-3)] mb-3.5">
+            Beyond Presence needs a public tunnel to hit your local brain. Copy your URL from the <code>npx localtunnel --port 8000</code> terminal window:
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="url"
+              placeholder="https://example-tunnel.locallt.ly"
+              value={tunnelInput}
+              onChange={(e) => setTunnelInput(e.target.value)}
+              className="min-w-0 flex-1 rounded-lg border border-[color:var(--line-2)] bg-[color:var(--bg)] px-3 py-1.5 text-xs text-[color:var(--fg)] placeholder:text-[color:var(--fg-3)] outline-none focus:border-amber-500"
+            />
+            <button
+              type="button"
+              onClick={async () => {
+                if (!tunnelInput.trim()) return alert("Please enter a valid localtunnel URL");
+                setLoading(true);
+                try {
+                  await registerAgent(tunnelInput.trim());
+                } catch {}
+                setLoading(false);
+              }}
+              disabled={loading || !tunnelInput.trim()}
+              className="rounded-lg bg-amber-500 hover:bg-amber-600 px-3.5 py-1.5 text-xs font-bold text-black transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {loading ? "Connecting..." : "Register"}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="mt-8 grid w-full max-w-md gap-2">
         {SUGGESTIONS.map((s) => (

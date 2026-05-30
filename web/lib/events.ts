@@ -3,6 +3,7 @@ export type GraphEdge = { from: string; to: string; rel: string };
 export type GraphDelta = { nodes: GraphNode[]; edges: GraphEdge[] };
 
 export type ChatEvent =
+  | { type: "init_graph"; graph: GraphDelta }
   | { type: "message_start"; id: string }
   | { type: "token"; text: string }
   | { type: "tool_call"; id: string; name: string; args: Record<string, unknown> }
