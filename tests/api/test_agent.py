@@ -79,3 +79,30 @@ def test_agent_dedupes_citations_by_chunk_id():
     )
     cites = [e for e in events if e.type == "citation"]
     assert len({c.chunk_text for c in cites}) == len(cites)
+
+
+class _AlwaysToolMessages:
+    def create(self, **kw):
+        class _B:
+            type = "tool_use"; id = "tc"; name = "search_knowledge"; input = {"query": "x"}
+        class _M:
+            content = [_B()]; stop_reason = "tool_use"
+        return _M()
+
+
+class _AlwaysToolClient:
+    def __init__(self):
+        self.messages = _AlwaysToolMessages()
+
+
+def test_agent_marks_max_turns_exhaustion():
+    events = _collect(
+        [{"role": "user", "content": "loop forever"}],
+        client=_AlwaysToolClient(), run_tool=_fake_run_tool,
+        store=None, embedder=None, max_sensitivity="C2 Internal",
+        model="claude-test", system="sys",
+    )
+    assert events[0].type == "message_start"
+    end = events[-1]
+    assert end.type == "message_end"
+    assert end.stop_reason == "max_turns"

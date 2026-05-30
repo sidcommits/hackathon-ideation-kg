@@ -32,6 +32,7 @@ async def run_agent(
 
     yield MessageStart(id="msg")
 
+    stop_reason = "max_turns"
     for _turn in range(MAX_TURNS):
         msg = client.messages.create(
             model=model,
@@ -58,6 +59,7 @@ async def run_agent(
         convo.append({"role": "assistant", "content": assistant_content})
 
         if msg.stop_reason != "tool_use" or not tool_uses:
+            stop_reason = msg.stop_reason or "end_turn"
             break
 
         tool_results_block = []
@@ -84,7 +86,7 @@ async def run_agent(
 
     for c in pending_citations:
         yield c
-    yield MessageEnd(stop_reason="end_turn")
+    yield MessageEnd(stop_reason=stop_reason)
 
 
 def make_client(api_key: str) -> Anthropic:
