@@ -8,6 +8,13 @@
 
 ---
 
+> ## ⚠️ Implementation status (2026-05-30)
+> This is an **aspirational, full-vision** spec. What is **actually built** in the repo today:
+> - ✅ **Engine** — ingestion pipeline + Neo4j knowledge graph + `query()` seam, now on **shared Neo4j Aura**.
+> - ✅ **Text-chat copilot** — FastAPI `/chat` SSE + Claude **tool-use agent loop** (`api/`), Next.js UI with live **tool-call trace**, **cited sources + sensitivity badges**, and a **conversation-reactive graph** (`web/`). Tested (backend 58, frontend 13 + Playwright).
+>
+> **Not yet built** (described below as if present): the **Deepgram** live-audio pipeline, **ElevenLabs** TTS / **WebGL 3D avatar**, the literal **3-panel workspace**, the **confidence-gated curation queue** (FR-03), the **MCP alert routing** (FR-04), and the **causal elimination tree** (FR-05). The directory layout below (`src/company_brain/audio/`, `src/frontend/workspace/`, `mocks/`) is **proposed** — the real code is `api/` + `web/`. See `architecture.md` (actual system) and `TODO.md` (current state + next steps) for ground truth.
+
 ## 1. Overview
 
 ### 1.1 Problem Statement

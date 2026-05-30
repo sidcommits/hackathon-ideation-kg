@@ -19,7 +19,7 @@ The product has two tightly-coupled halves, mirroring the planned UI:
 - **The Brain that answers (live):** an avatar of the expert that listens to an incoming client call, transcribes it, reasons over the knowledge graph, and surfaces the exact reference material and a proposed solution in real time — with a human in control.
 - **The Brain that grows (curation):** a self-evolving knowledge graph. New documents/recordings can be ingested anytime; after each conversation the system proposes inferences, solutions, and "truths," and a human confirms / improves / denies them before they enter the graph.
 
-> **What already exists (this repo):** the **ingestion pipeline + knowledge graph engine** and a `query()` retrieval seam (vector search + graph expansion with citations and access-level filtering). The live-call copilot UI, the avatar, the human-in-the-loop curation UI, and TTS/autonomy are **planned** and specified below.
+> **What already exists (this repo, updated 2026-05-30):** the **ingestion pipeline + knowledge graph engine** with a `query()` retrieval seam (vector search + graph expansion, citations, access-level filtering) — now on a **shared Neo4j Aura** instance — **plus a working text-chat copilot**: a FastAPI `/chat` SSE endpoint driving a Claude **tool-use agent loop**, and a Next.js UI that streams the answer, the live **tool-call reasoning trace**, **cited sources with sensitivity badges**, and a **conversation-reactive knowledge graph**. Still **planned**: live-call **audio** (STT) + **push-to-talk**, the **avatar** + TTS/autonomy, and the **human-in-the-loop curation** panel — specified below. (The current chat is the copilot's center panel in text form; voice/avatar/curation are the remaining build.)
 
 ## 2. Goals & non-goals
 
@@ -171,10 +171,12 @@ Audio/call stream ─▶ live transcription ─▶ query() ─▶ Knowledge Grap
 - Telephony/CRM integration internals; production hosting, SSO, multi-tenant RBAC beyond sensitivity labels; billing; mobile.
 
 ## 11. Roadmap
-- **Phase 0 — Engine (done):** ingestion + knowledge graph + `query()` seam + governance primitives.
-- **Phase 1 — Hackathon MVP:** live transcription + just-in-time cited retrieval (center), document/MP3 enrichment + post-call HITL curation (right), demo narrative end-to-end.
-- **Phase 2 — Polish/stretch:** reasoning + tool-call visualization, proposed answers, avatar + states, conversation feedback loop wired.
-- **Phase 3 — Beyond:** autonomous TTS answering, email channel, audit log, production access control.
+- **Phase 0 — Engine (✅ done):** ingestion + knowledge graph + `query()` seam + governance primitives. Now hosted on shared **Neo4j Aura**.
+- **Phase 1 — Chat copilot (✅ done):** text-chat over the graph — Claude tool-use agent loop, **just-in-time cited retrieval** (center, text form), **live tool-call/reasoning-trace visualization**, and a **conversation-reactive knowledge graph**. End-to-end, tested, on Aura.
+- **Phase 2 — Live call + curation (next):** swap text input for **live audio** (STT) + push-to-talk, add the **post-call HITL curation** panel (proposed inferences → approve/deny → graph) and the conversation feedback loop (`source_type="conversation"`).
+- **Phase 3 — Avatar & autonomy:** 3D avatar with call-state, **TTS** answers, autonomous mode; email channel, audit log, production access control.
+
+> **Note:** Phase 1 (above) was delivered as a deliberate slice of the FR-LC-* center panel — the reasoning/retrieval/trace/graph parts in **text chat**, with the **voice/avatar/curation** scope (FR-LC-1/2/6, FR-AV-*, FR-EN-*) explicitly deferred to Phases 2–3. The event contract is forward-compatible with the voice additions (additive event types, no rewrite).
 
 ---
 

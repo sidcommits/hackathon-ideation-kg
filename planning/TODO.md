@@ -4,31 +4,29 @@ Deferred work items, most recent first.
 
 ---
 
-## SESSION HANDOFF — 2026-05-30
+## SESSION HANDOFF — 2026-05-30 (chat layer + Aura)
 
 **Where things stand (read this first in a new session):**
 
-- **Engine is built & working end-to-end on real data.** Ingestion → Neo4j knowledge graph → `query()` seam. Verified with a real ingest (OpenAI embeddings + Anthropic Sonnet extraction).
-- **Live Neo4j is running** on `bolt://localhost:7687` (`neo4j`/`testpassword`, Docker container `six_hack_zurich-neo4j-1`) holding real data: backbone (MiFIR/MiFID, SFDR, FATCA + LLM-extracted reg structure), the SME transcript insights, and a **partial FATCA ingest (38/290 chunks extracted, 254 pending)**.
-- **Resume the FATCA ingest anytime:** `EMBEDDER=openai EMBEDDING_MODEL=text-embedding-3-small python -m company_brain.ingest sample_corpus` — it skips done chunks (checkpointed) and finishes the rest (~254 chunks = real $ cost).
-- **⚠️ Do NOT run the Neo4j integration tests against 7687** — the test fixtures `MATCH (n) DETACH DELETE n` and will wipe the graph. Use a throwaway container: `docker run -d --name neo4j_test -p 7688:7687 -e NEO4J_AUTH=neo4j/testpassword neo4j:5.23` then `NEO4J_URI=bolt://localhost:7688 NEO4J_PASSWORD=testpassword pytest`.
-- **`.env` quirks:** `EMBEDDER` is still `local` in `.env` (override on CLI as above for OpenAI). LLM is Anthropic (`ANTHROPIC_API_KEY` set). `OPENAI_API_KEY` set (real OpenAI, for embeddings). OpenRouter LLM path is NOT wired (OpenAIProvider in `providers/llm.py` is still a stub).
+- **The full conversational layer is built** on branch `feat/company-brain-chat`: a FastAPI backend (`api/`) + a Next.js frontend (`web/`) on top of the engine. A real Claude **tool-use agent loop** streams typed SSE events from `POST /chat` that drive the chat, the **tool-call cards** (visible reasoning trace), and a **conversation-reactive knowledge graph**. Tools: `search_knowledge`, `expand_graph`, `lookup_backbone`. See `architecture.md` (full-system, 8 diagrams) and `superpowers/{specs,plans}/2026-05-30-company-brain-chat*`.
+- **Graph is on Neo4j Aura now (shared with the team).** `.env` `NEO4J_*` points at `neo4j+s://e3874057.databases.neo4j.io` (user = the instance id; local Docker is commented as a fallback). Migrated non-destructively via `scripts/migrate_to_aura.py` — 881 nodes / 2,787 edges, **embeddings + vector index preserved**, counts verified. Future `ingest` runs write to Aura and `MERGE` additively (cumulative; no re-migration).
+- **Corpus loaded on Aura:** `sample_corpus` (3 docs → 46 chunks, ~240 `Insight` nodes, ~2,787 edges): the SFDR ESAs report + the SME transcript + the `SIX_Data Attributes.xlsx` backbone. Add the rest later: `python -m company_brain.ingest <dir>`.
+- **Providers:** `EMBEDDER=openai`, `EMBEDDING_MODEL=text-embedding-3-small` (1536-d); `LLM_PROVIDER=anthropic` (`claude-sonnet-4-6`). Keys live in `.env` (gitignored — rotate if the repo/transcript is ever shared).
+- **Tests green:** backend **58** (`pytest -m "not integration"`) incl. the real access-control leak test; frontend **13 Vitest + 1 Playwright** (`cd web && npm test` / `npx playwright test`).
+- **Run the demo:** `python -m uvicorn api.main:app --port 8000` + `cd web && npm run dev` → http://localhost:3000. **Restart uvicorn after any `.env` change** — it caches the store/embedder via `lru_cache`.
 
-**Uncommitted work from this session (on disk, not committed — user controls commits):**
-- `model.py` → Pydantic v2 BaseModels (FastAPI-ready); `pydantic>=2` added to deps.
-- `providers/embedder.py` → `OpenAIEmbedder` implemented (text-embedding-3); `config.py` + `.env.example` add `OPENAI_API_KEY`/`OPENAI_BASE_URL`/`EMBEDDING_DIM`.
-- `graph.py` + `ingest.py` → **resumable ingestion** (`pending_chunks`/`mark_extracted`, per-chunk checkpoint) + robustness fixes (skip malformed LLM items, null-endpoint guard, per-chunk error isolation).
-- Test fixtures self-heal the vector index (`DROP INDEX chunk_vec`) for dim changes; new resume + malformed-item tests.
-- `scripts/visualize_graph.py` (+ `graph_viz*.html`), `sample_corpus/`, this `TODO.md`.
-- **All tests green** (33+ via pure-logic + throwaway Neo4j).
+**⚠️ Standing rules (do not break):**
+- **Never wipe the graph** — no `MATCH (n) DETACH DELETE n`, no dropping the `chunk_vec` index, no destructive "fixes" — unless explicitly told. The Neo4j **integration tests** run `DETACH DELETE` and will wipe whatever DB they point at: **never run them against the live store** (Aura or `:7687`); use a throwaway container on `:7688`.
+- **No `git push`** without an explicit ask. (Per-task local commits during the chat build were authorized.)
 
-**Next features (user will do in a new session):**
-1. `Settings` → `pydantic-settings.BaseSettings` (idiomatic FastAPI config). **Recommended first.**
-2. Extraction output (`extract.py`) → Pydantic models; derive Anthropic tool schema from `.model_json_schema()`.
-3. `query()` result → `QueryResponse` Pydantic model (FastAPI `response_model`).
-4. Stand up the **FastAPI app** consuming `query()` + the ingestion entry point.
-5. Tune `CHUNK_MAX_CHARS` up / page caps before big-doc ingest (FATCA over-chunks → 290 chunks).
-6. (Optional) Wire `OpenAIProvider` (LLM) → OpenRouter.
+**Notable fixes this session:** `sse-starlette` emits **CRLF** (`\r\n\r\n`) SSE frame separators; the frontend parser now normalizes CRLF→LF (was rendering a blank chat before). Reducer clears tool cards per turn + surfaces `error` events; agent reports honest `stop_reason` on max-turns.
+
+**Next (toward the full PRD vision — see `PRD.md` / `new_PRD_v2.md`):**
+1. **Full-corpus ingest on Aura** (the long PDFs are the real $ cost — tune `CHUNK_MAX_CHARS` / add page caps first; FATCA over-chunked to ~290).
+2. **v2 voice / avatar** ("talk to it", ChatGPT-voice style) — the SSE event union is intentionally open for additive `transcript` / `audio` event types, so this is additive, not a rewrite.
+3. **Curation / HITL panel** (post-conversation proposed inferences → confirm / improve / deny → graph) — FR-EN-* in the PRD.
+4. **Conversation feedback loop** — ingest finished chats as `source_type="conversation"` (designed in the engine, not yet wired).
+5. **In-product ingestion status** (below).
 
 ---
 
