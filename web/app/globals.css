@@ -1,26 +1,242 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+/* ============================================================
+   SIX · Company Brain — institutional-grade visual identity
+   Dark, near-black canvas. Bloomberg / Linear / Mercury tone.
+   Semantic node palette ties graph legend ↔ UI.
+   ============================================================ */
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Deep-space canvas */
+  --bg:        #0A0B0D;
+  --bg-2:      #0E1014;   /* raised surface */
+  --bg-3:      #14171C;   /* card / input */
+  --line:      #1C2026;   /* hairline borders */
+  --line-2:    #262B33;   /* stronger borders / hover */
+
+  /* Type */
+  --fg:        #E7EAEE;   /* primary text */
+  --fg-2:      #9BA3AE;   /* secondary */
+  --fg-3:      #646C78;   /* muted / captions */
+
+  /* Single accent — a cold institutional cyan-teal */
+  --accent:        #38E0C8;
+  --accent-dim:    #1F8E7E;
+  --accent-glow:   rgba(56, 224, 200, 0.16);
+
+  /* Semantic node palette (graph ↔ legend ↔ UI) */
+  --node-backbone:  #34D399; /* green  — Regulation / DataAttribute / InstrumentType */
+  --node-reasoning: #60A5FA; /* blue   — Obligation / Concept / Insight */
+  --node-provenance:#C084FC; /* purple — Document / Chunk */
+
+  /* Sensitivity */
+  --sev-internal:  #E0A93B; /* amber */
+  --sev-conf:      #F1607E; /* rose  */
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--bg);
+  --color-foreground: var(--fg);
   --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-mono: var(--font-jetbrains-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---- Atmospheric backdrop: a faint top-lit aurora + grid grain ---- */
+.brain-canvas {
+  position: relative;
+  isolation: isolate;
+  background:
+    radial-gradient(120% 80% at 50% -20%, rgba(56, 224, 200, 0.07), transparent 60%),
+    radial-gradient(90% 60% at 100% 0%, rgba(96, 165, 250, 0.05), transparent 55%),
+    var(--bg);
+}
+.brain-canvas::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.018) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(120% 100% at 50% 0%, #000 30%, transparent 90%);
+}
+
+/* ---- Scrollbars: thin, ghostly, on-brand ---- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-2) transparent;
+}
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--line-2);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #333a44;
+  background-clip: content-box;
+}
+
+/* ---- Streaming caret (token streaming) ---- */
+.stream-caret {
+  display: inline-block;
+  width: 0.5ch;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: var(--accent);
+  border-radius: 1px;
+  box-shadow: 0 0 8px var(--accent-glow);
+  animation: caret-blink 1.05s steps(2, jump-none) infinite;
+}
+@keyframes caret-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  46%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ---- Tool card: running → done resolve ---- */
+@keyframes tool-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.tool-card {
+  animation: tool-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.tool-pulse {
+  position: relative;
+}
+.tool-pulse::after {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: inherit;
+  box-shadow: 0 0 0 0 var(--accent-glow);
+  animation: tool-ring 1.6s ease-out infinite;
+}
+@keyframes tool-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(56, 224, 200, 0.35);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 7px rgba(56, 224, 200, 0);
+  }
+}
+
+/* ---- Message entrance ---- */
+@keyframes msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.msg-in {
+  animation: msg-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ---- Empty-state hero shimmer ---- */
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.hero-rise {
+  animation: hero-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ---- Glass elevation utility ---- */
+.glass {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0) 40%),
+    var(--bg-3);
+  border: 1px solid var(--line);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.03) inset,
+    0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+}
+
+/* ---- Focus ring on input ---- */
+.input-focus:focus-within {
+  border-color: var(--accent-dim);
+  box-shadow:
+    0 0 0 1px var(--accent-dim),
+    0 0 0 4px var(--accent-glow);
+}
+
+/* ---- Markdown / prose tuning inside bubbles ---- */
+.prose :where(code):not(:where(pre code)) {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.1em 0.36em;
+  border-radius: 5px;
+  font-size: 0.86em;
+  font-weight: 500;
+}
+.prose :where(a) {
+  color: var(--accent);
+  text-decoration-color: var(--accent-dim);
+  text-underline-offset: 3px;
+}
+.prose :where(strong) {
+  color: var(--fg);
+  font-weight: 650;
+}
+.prose :where(p):first-child {
+  margin-top: 0;
+}
+.prose :where(p):last-child {
+  margin-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }
