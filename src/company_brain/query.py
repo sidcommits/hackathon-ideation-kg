@@ -9,7 +9,8 @@ def query(question: str, *, store, embedder, max_sensitivity: str = "C2 Internal
     hits = store.vector_search(q_emb, k=k, max_sensitivity=max_sensitivity)
 
     citations = [
-        {"doc_title": h["title"], "sensitivity": h["sensitivity"], "chunk_text": h["text"]}
+        {"doc_title": h["title"], "doc_id": h["doc_id"], "chunk_id": h["chunk_id"],
+         "sensitivity": h["sensitivity"], "chunk_text": h["text"]}
         for h in hits
     ]
 
@@ -27,6 +28,7 @@ def query(question: str, *, store, embedder, max_sensitivity: str = "C2 Internal
         )
         row = related[0] if related else {"entities": [], "insights": []}
         context.append({
+            "chunk_id": h["chunk_id"],
             "chunk_text": h["text"],
             "score": h["score"],
             "entities": [x for x in row["entities"] if x],
