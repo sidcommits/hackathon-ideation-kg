@@ -146,6 +146,7 @@ export function GraphCanvas({ graph }: { graph: GraphState }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const fgRef = useRef<any>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
+  const [hoveredNode, setHoveredNode] = useState<any | null>(null);
 
   useEffect(() => {
     const el = wrapRef.current;
@@ -161,15 +162,21 @@ export function GraphCanvas({ graph }: { graph: GraphState }) {
   // Dynamically configure D3 forces and auto-fit graph to look spacious and stunning
   useEffect(() => {
     if (fgRef.current && !empty) {
-      fgRef.current.d3Force("charge").strength(-240);
-      fgRef.current.d3Force("link").distance(100);
-      
+      fgRef.current.d3Force("charge").strength(-10);
+      fgRef.current.d3Force("link").distance(15);
+
+      // Strengthen the center force to pull all nodes into one tight cluster
+      const centerForce = fgRef.current.d3Force("center");
+      if (centerForce) {
+        centerForce.strength(1.2);
+      }
+
       // Auto-fit camera to contain all nodes with a smooth animation and padding
       setTimeout(() => {
         if (fgRef.current) {
-          fgRef.current.zoomToFit(600, 60);
+          fgRef.current.zoomToFit(800, 45);
         }
-      }, 100);
+      }, 150);
     }
   }, [data, empty]);
 
@@ -216,58 +223,89 @@ export function GraphCanvas({ graph }: { graph: GraphState }) {
       {size.w > 0 && (
         <ErrorBoundary fallback={<GraphFallback graph={graph} />}>
           <ForceGraph2D
-          ref={fgRef}
-          graphData={data}
-          width={size.w}
-          height={size.h}
-          backgroundColor="rgba(0,0,0,0)"
-          nodeRelSize={5}
-          linkColor={() => "rgba(148,163,184,0.18)"}
-          linkWidth={0.8}
-          linkDirectionalParticles={1}
-          linkDirectionalParticleWidth={2}
-          linkDirectionalParticleColor={() => "rgba(56,224,200,0.7)"}
-          nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D, scale: number) => {
-            // Coordinates are undefined on the first tick before the force
-            // simulation positions nodes — bail to avoid non-finite canvas ops.
-            if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) return;
-            const color = COLOR[node.label] ?? "#94A3B8";
-            const isPulsed = pulsed.has(node.id);
-            const r = isPulsed ? 6 : 4;
+            ref={fgRef}
+            graphData={data}
+            width={size.w}
+            height={size.h}
+            backgroundColor="rgba(0,0,0,0)"
+            nodeRelSize={5}
+            linkColor={() => "rgba(148,163,184,0.18)"}
+            linkWidth={0.8}
+            linkDirectionalParticles={2}
+            linkDirectionalParticleSpeed={0.015}
+            linkDirectionalParticleWidth={2}
+            linkDirectionalParticleColor={() => "rgba(56,224,200,0.75)"}
+            onNodeHover={(node) => setHoveredNode(node)}
+            nodeCanvasObject={(node: any, ctx: CanvasRenderingContext2D, scale: number) => {
+              // Coordinates are undefined on the first tick before the force
+              // simulation positions nodes — bail to avoid non-finite canvas ops.
+              if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) return;
+              const color = COLOR[node.label] ?? "#94A3B8";
+              const isPulsed = pulsed.has(node.id);
+              const r = isPulsed ? 6 : 4;
 
-            // synapse pulse — soft halo on newly-traversed nodes
-            if (isPulsed) {
-              const grad = ctx.createRadialGradient(
-                node.x,
-                node.y,
-                0,
-                node.x,
-                node.y,
-                r + 9,
-              );
-              grad.addColorStop(0, color + "55");
-              grad.addColorStop(1, color + "00");
+              // synapse pulse — soft halo on newly-traversed nodes
+              if (isPulsed) {
+                const grad = ctx.createRadialGradient(
+                  node.x,
+                  node.y,
+                  0,
+                  node.x,
+                  node.y,
+                  r + 9,
+                );
+                grad.addColorStop(0, color + "55");
+                grad.addColorStop(1, color + "00");
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, r + 9, 0, 2 * Math.PI);
+                ctx.fillStyle = grad;
+                ctx.fill();
+              }
+
+              // node core with subtle ring
               ctx.beginPath();
-              ctx.arc(node.x, node.y, r + 9, 0, 2 * Math.PI);
-              ctx.fillStyle = grad;
+              ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
+              ctx.fillStyle = color;
               ctx.fill();
-            }
+              ctx.lineWidth = 1 / scale;
+              ctx.strokeStyle = "rgba(10,11,13,0.9)";
+              ctx.stroke();
 
-            // node core with subtle ring
-            ctx.beginPath();
-            ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
-            ctx.fillStyle = color;
-            ctx.fill();
-            ctx.lineWidth = 1 / scale;
-            ctx.strokeStyle = "rgba(10,11,13,0.9)";
-            ctx.stroke();
+              // Render node labels only on hover for clean visual aesthetics
+              const isHovered = hoveredNode && hoveredNode.id === node.id;
+              if (isHovered) {
+                const text = node.name;
+                ctx.font = `600 ${11 / scale}px ui-sans-serif, system-ui, sans-serif`;
 
-            if (scale > 1.4) {
-              ctx.font = `500 ${10 / scale}px ui-sans-serif, system-ui, sans-serif`;
-              ctx.fillStyle = "rgba(206,212,222,0.9)";
-              ctx.fillText(node.name, node.x + r + 2.5, node.y + 3);
-            }
-          }}
+                // Measure text to draw an elegant backdrop card
+                const textWidth = ctx.measureText(text).width;
+                const padX = 6 / scale;
+                const padY = 3.5 / scale;
+                const rectW = textWidth + padX * 2;
+                const rectH = 15 / scale;
+                const rectX = node.x + r + 3;
+                const rectY = node.y - rectH / 2;
+
+                // Draw rounded rect backdrop
+                ctx.fillStyle = "rgba(10,11,13,0.92)";
+                ctx.beginPath();
+                if (typeof (ctx as any).roundRect === "function") {
+                  (ctx as any).roundRect(rectX, rectY, rectW, rectH, 3 / scale);
+                } else {
+                  ctx.rect(rectX, rectY, rectW, rectH);
+                }
+                ctx.fill();
+
+                // Draw subtle neon accent border matching the node color
+                ctx.strokeStyle = color + "aa";
+                ctx.lineWidth = 1 / scale;
+                ctx.stroke();
+
+                // Draw sharp, highly visible white text inside
+                ctx.fillStyle = "#FFFFFF";
+                ctx.fillText(text, rectX + padX, rectY + rectH - padY - 0.5);
+              }
+            }}
           />
         </ErrorBoundary>
       )}

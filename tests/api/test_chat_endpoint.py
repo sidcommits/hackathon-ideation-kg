@@ -66,3 +66,54 @@ def test_chat_forwards_max_sensitivity(monkeypatch):
     sensitivities = {e["sensitivity"] for e in events if e["type"] == "citation"}
     assert "Confidential" not in sensitivities
     assert sensitivities == {"C2 Internal"}
+
+
+def test_v1_chat_completions_streaming(monkeypatch):
+    from api.events import MessageStart, Token, MessageEnd
+
+    async def fake_agent(messages, **kw):
+        yield MessageStart(id="m")
+        yield Token(text="hello ")
+        yield Token(text="there")
+        yield MessageEnd(stop_reason="end_turn")
+
+    monkeypatch.setattr(main, "run_agent", fake_agent)
+
+    client = TestClient(app)
+    resp = client.post("/v1/chat/completions", json={
+        "messages": [{"role": "system", "content": "you are a helper"}, {"role": "user", "content": "hi"}],
+        "stream": True
+    })
+    assert resp.status_code == 200
+    assert "text/event-stream" in resp.headers["content-type"]
+    
+    # Parse SSE chunks
+    text_chunks = []
+    for line in resp.text.splitlines():
+        if line.startswith("data: ") and not line.endswith("[DONE]"):
+            data = json.loads(line[len("data: "):])
+            if "choices" in data:
+                text_chunks.append(data["choices"][0]["delta"].get("content", ""))
+    assert "".join(text_chunks) == "hello there"
+
+
+def test_v1_chat_completions_non_streaming(monkeypatch):
+    from api.events import MessageStart, Token, MessageEnd
+
+    async def fake_agent(messages, **kw):
+        yield MessageStart(id="m")
+        yield Token(text="hello ")
+        yield Token(text="there")
+        yield MessageEnd(stop_reason="end_turn")
+
+    monkeypatch.setattr(main, "run_agent", fake_agent)
+
+    client = TestClient(app)
+    resp = client.post("/v1/chat/completions", json={
+        "messages": [{"role": "user", "content": "hi"}],
+        "stream": False
+    })
+    assert resp.status_code == 200
+    assert "application/json" in resp.headers["content-type"]
+    data = resp.json()
+    assert data["choices"][0]["message"]["content"] == "hello there"

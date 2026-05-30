@@ -86,6 +86,46 @@ async def update_clearance(req: ClearanceRequest):
     return {"success": True, "clearance": req.clearance}
 
 
+def preprocess_messages(messages: list[dict], system_prompt: str) -> tuple[list[dict], str]:
+    processed_messages = []
+    custom_system_parts = [system_prompt]
+    
+    for msg in messages:
+        role = msg.get("role")
+        content = msg.get("content") or ""
+        
+        if role == "system":
+            if content:
+                custom_system_parts.append(content)
+            continue
+            
+        if role not in {"user", "assistant"}:
+            role = "user"
+            
+        processed_messages.append({"role": role, "content": content})
+        
+    # Combine consecutive roles
+    alternating = []
+    for msg in processed_messages:
+        if not msg["content"]:
+            continue
+        if alternating and alternating[-1]["role"] == msg["role"]:
+            alternating[-1]["content"] += "\n\n" + msg["content"]
+        else:
+            alternating.append(msg)
+            
+    # Ensure starts with "user"
+    while alternating and alternating[0]["role"] != "user":
+        alternating.pop(0)
+        
+    # If empty after filtering, add a placeholder user message
+    if not alternating:
+        alternating.append({"role": "user", "content": "Hello"})
+        
+    final_system = "\n\n".join(custom_system_parts)
+    return alternating, final_system
+
+
 class ChatRequest(BaseModel):
     messages: list[dict]
     max_sensitivity: str = "C2 Internal"
@@ -95,18 +135,21 @@ class ChatRequest(BaseModel):
 async def chat(req: ChatRequest):
     settings = get_settings()
 
+    # Preprocess messages to be fully Anthropic-compliant
+    messages_payload, system_prompt = preprocess_messages(req.messages, SYSTEM_PROMPT)
+
     async def event_source():
         try:
             client = make_client(settings.anthropic_api_key)
             agen = run_agent(
-                req.messages,
+                messages_payload,
                 client=client,
                 run_tool=run_tool,
                 store=get_store(),
                 embedder=get_embedder_cached(),
                 max_sensitivity=req.max_sensitivity,
                 model=settings.extraction_model,
-                system=SYSTEM_PROMPT,
+                system=system_prompt,
             )
             async for event in agen:
                 yield {"data": event.model_dump_json()}
@@ -327,7 +370,7 @@ async def call_events(call_id: str = Path(...)):
 
 class BPMessage(BaseModel):
     role: str
-    content: str
+    content: str | None = ""
 
 
 class BPCompletionsRequest(BaseModel):
@@ -346,8 +389,19 @@ async def chat_completions(req: BPCompletionsRequest):
     max_sensitivity = active_call.max_sensitivity if active_call else "C2 Internal"
 
     # Map standard message shapes
-    messages_payload = [{"role": m.role, "content": m.content} for m in req.messages]
+    raw_messages = [{"role": m.role, "content": m.content or ""} for m in req.messages]
 
+    # Preprocess messages to be fully Anthropic-compliant
+    messages_payload, system_prompt = preprocess_messages(raw_messages, SYSTEM_PROMPT)
+
+    # NOTE: We always force streaming for this endpoint regardless of req.stream.
+    # Beyond Presence has a short LLM response timeout — if we respond non-streaming,
+    # the full RAG pipeline takes 20-25 seconds and the avatar times out silently.
+    # With streaming, BP receives the first token in ~2-3 seconds and starts
+    # speaking immediately while the rest of the response streams in.
+    _ = req.stream  # acknowledged but ignored — always stream
+
+    # Streaming response: pipe tokens to Beyond Presence lip-sync
     async def event_source():
         try:
             client = make_client(settings.anthropic_api_key)
@@ -359,7 +413,7 @@ async def chat_completions(req: BPCompletionsRequest):
                 embedder=get_embedder_cached(),
                 max_sensitivity=max_sensitivity,
                 model=settings.extraction_model,
-                system=SYSTEM_PROMPT,
+                system=system_prompt,
             )
 
             async for event in agen:
