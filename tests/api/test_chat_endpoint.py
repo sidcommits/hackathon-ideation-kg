@@ -36,8 +36,11 @@ def test_chat_streams_event_sequence(monkeypatch):
     assert any(e["type"] == "tool_result" for e in events)
 
 
-def test_chat_never_leaks_confidential_at_c2(monkeypatch):
-    """Access control: with max_sensitivity=C2 Internal, no Confidential citation may appear."""
+def test_chat_forwards_max_sensitivity(monkeypatch):
+    """Endpoint forwarding: the endpoint passes max_sensitivity through to the agent and
+    streams only the citations the agent yields. This does NOT prove end-to-end
+    server-side enforcement (the fake agent reimplements the filter); real enforcement
+    is covered by tests/api/test_access_control.py against GraphStore.vector_search."""
     from api.events import MessageStart, Citation, MessageEnd
 
     async def fake_agent(messages, *, max_sensitivity, **kw):
