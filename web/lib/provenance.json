@@ -11,7 +11,7 @@
 
   "EU-MiIFID_six-infographics-mifid-II-reference-data-en.pdf": { "chain": ["Confluence", "Reference Data"], "url": "https://six-group.atlassian.net/wiki/spaces/REFDATA/pages/655401/MiFID-II-Reference-Data-Infographic" },
 
-  "six-handbook-regulatory-navigator-en.pdf": { "chain": ["Confluence", "Product Knowledge Base"], "url": "https://six-group.atlassian.net/wiki/spaces/PKB/pages/720911/SIX-Regulatory-Navigator-Handbook" },
+  "six-handbook-regulatory-navigator-en.pdf": { "chain": ["Google Docs", "Product Knowledge Base"], "url": "https://docs.google.com/document/d/REPLACE_WITH_YOUR_GOOGLE_DOC_ID/edit" },
   "six-handbook-tax-navigator-en.pdf": { "chain": ["Confluence", "Product Knowledge Base"], "url": "https://six-group.atlassian.net/wiki/spaces/PKB/pages/720933/SIX-Tax-Navigator-Handbook" },
 
   "EU_ESG_Template_20260410- EET V1.1.3_Editorial update (1).xlsx": { "chain": ["SharePoint", "Compliance Dept"], "url": "https://sixgroup.sharepoint.com/sites/Compliance/Shared%20Documents/Templates/EET_V1.1.3_EU_ESG_Template.xlsx" },
@@ -21,8 +21,8 @@
 
   "SIX_Data Attributes.xlsx": { "chain": ["SharePoint", "Reference Data"], "url": "https://sixgroup.sharepoint.com/sites/ReferenceData/Shared%20Documents/SIX_Data_Attributes.xlsx" },
 
-  "Product Coverage transcript (1).docx": { "chain": ["Google Docs", "SME Interviews"], "url": "https://docs.google.com/document/d/1pCov3rageTr4nscriptSMEa1B2c3D4e5/edit" },
-  "Regulatory Update transcript.docx": { "chain": ["Google Docs", "SME Interviews"], "url": "https://docs.google.com/document/d/1regUpd4teTr4nscriptSMEx9Y8z7W6v5/edit" },
+  "Product Coverage transcript (1).docx": { "chain": ["SharePoint", "SME Interviews (Restricted)"], "url": "https://sixgroup.sharepoint.com/sites/SMEKnowledge/Restricted/Interviews/Product-Coverage-Clarification.docx" },
+  "Regulatory Update transcript.docx": { "chain": ["SharePoint", "SME Interviews (Restricted)"], "url": "https://sixgroup.sharepoint.com/sites/SMEKnowledge/Restricted/Interviews/Regulatory-Update-Clarification.docx" },
 
   "Start Hack ZH_SIX_Presentation.pdf": { "chain": ["Google Docs", "Project Workspace"], "url": "https://docs.google.com/presentation/d/1st4rtH4ckZHSIXpres3nt4ti0nQ2w3e4/edit" },
 
