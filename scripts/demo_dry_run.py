@@ -15,12 +15,13 @@ Requires Neo4j running (docker compose up -d) and deps installed.
 """
 
 import logging
+import os
 import shutil
 import tempfile
 from pathlib import Path
 
 from company_brain.config import get_settings
-from company_brain.graph import GraphStore
+from company_brain.graph import GraphStore, _is_remote
 from company_brain.ingest import ingest_path
 from company_brain.providers.embedder import get_embedder
 from company_brain.query import query
@@ -66,6 +67,16 @@ def _count(store, label):
 
 def main():
     settings = get_settings()
+    # Safety: this demo WIPES the graph. It must never run against a remote/cloud
+    # database (NEO4J_URI in .env may point at Aura). Refuse loudly if so.
+    if _is_remote(settings.neo4j_uri):
+        raise SystemExit(
+            f"demo_dry_run wipes the graph and {settings.neo4j_uri!r} is REMOTE. "
+            "Point NEO4J_URI at a local Neo4j (bolt://localhost:7687) before running."
+        )
+    # Opt in to the local-only destructive guard for this intentional reset.
+    os.environ["COMPANY_BRAIN_ALLOW_DESTRUCTIVE"] = "1"
+
     store = GraphStore(settings.neo4j_uri, settings.neo4j_user, settings.neo4j_password)
     embedder = get_embedder(settings)
 

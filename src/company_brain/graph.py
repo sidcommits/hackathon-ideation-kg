@@ -1,17 +1,73 @@
+import os
+import re
+from urllib.parse import urlparse
+
 from neo4j import GraphDatabase
 
 # Sensitivity ordering for access-control filtering (higher = more restricted).
 _SENS_RANK = {"C2 Internal": 1, "Confidential": 2}
 
+# --- Destructive-statement guard -------------------------------------------
+# A "dry-run demo" once ran `MATCH (n) DETACH DELETE n` against the live Aura
+# graph (NEO4J_URI in .env points at cloud) and wiped 3.5k nodes. The same
+# wipe lives in every integration-test fixture. To make a graph wipe IMPOSSIBLE
+# by accident, run() refuses statements that can destroy data/schema unless an
+# explicit env opt-in is set — and refuses them outright on a remote (cloud)
+# database unless a SECOND, remote-specific opt-in is also set.
+_DESTRUCTIVE = re.compile(r"\bDETACH\s+DELETE\b|\bDROP\s+(?:INDEX|CONSTRAINT)\b", re.IGNORECASE)
+_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", ""}
+# Set to "1" to permit destructive statements at all (e.g. a local test reset).
+_ALLOW_ENV = "COMPANY_BRAIN_ALLOW_DESTRUCTIVE"
+# Additionally required to permit them against a remote/cloud database.
+_ALLOW_REMOTE_ENV = "COMPANY_BRAIN_ALLOW_REMOTE_DESTRUCTIVE"
+
+
+def _is_remote(uri: str) -> bool:
+    """True unless the URI points at a local Neo4j (localhost/127.0.0.1)."""
+    try:
+        host = (urlparse(uri).hostname or "").lower()
+    except Exception:
+        return True  # fail safe: treat unparseable as remote
+    return host not in _LOCAL_HOSTS
+
+
+class GraphWipeBlocked(RuntimeError):
+    """Raised when a destructive Cypher statement is blocked by the guard."""
+
 
 class GraphStore:
     def __init__(self, uri: str, user: str, password: str):
+        self._uri = uri
+        self._remote = _is_remote(uri)
         self._driver = GraphDatabase.driver(uri, auth=(user, password))
 
     def close(self):
         self._driver.close()
 
+    def _guard(self, cypher: str) -> None:
+        """Block data/schema-destroying statements unless explicitly opted in.
+
+        Raises BEFORE any query reaches the server, so a blocked wipe never
+        touches the database.
+        """
+        if not _DESTRUCTIVE.search(cypher):
+            return
+        allowed = os.getenv(_ALLOW_ENV) == "1"
+        if self._remote and not (allowed and os.getenv(_ALLOW_REMOTE_ENV) == "1"):
+            raise GraphWipeBlocked(
+                f"Refusing destructive statement against REMOTE graph {self._uri!r}. "
+                f"This guard exists because a wipe nuked the live cloud graph. "
+                f"If you REALLY mean it, set {_ALLOW_ENV}=1 and {_ALLOW_REMOTE_ENV}=1. "
+                f"Statement: {cypher.strip()[:120]!r}"
+            )
+        if not allowed:
+            raise GraphWipeBlocked(
+                f"Refusing destructive statement. Set {_ALLOW_ENV}=1 to allow "
+                f"(local resets only). Statement: {cypher.strip()[:120]!r}"
+            )
+
     def run(self, cypher: str, **params) -> list[dict]:
+        self._guard(cypher)
         with self._driver.session() as session:
             return [r.data() for r in session.run(cypher, **params)]
 

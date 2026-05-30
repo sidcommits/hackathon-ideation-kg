@@ -1,6 +1,13 @@
 import os
 import pytest
 
+# Integration-test fixtures reset the graph with `MATCH (n) DETACH DELETE n`.
+# GraphStore's guard blocks destructive statements unless opted in; allow them
+# here for intentional LOCAL test resets. We deliberately do NOT set
+# COMPANY_BRAIN_ALLOW_REMOTE_DESTRUCTIVE, so a test run can never wipe a cloud
+# graph even if NEO4J_URI points at Aura.
+os.environ.setdefault("COMPANY_BRAIN_ALLOW_DESTRUCTIVE", "1")
+
 
 @pytest.fixture
 def fake_provider():

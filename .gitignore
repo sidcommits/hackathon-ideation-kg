@@ -7,3 +7,5 @@ __pycache__/
 graph_viz*.html
 sample_corpus/
 .playwright-mcp/
+snapshots/
+graph_backup/

@@ -2,7 +2,42 @@
 
 **Date:** 2026-05-30  
 **Author:** Engineering  
-**Status:** 🔴 Unresolved — streaming synthesis turn still returns empty response  
+**Status:** ✅ Resolved (2026-05-30) — see Resolution below.
+
+---
+
+## Resolution (2026-05-30)
+
+**Root cause (verified against the live API, not guessed):** the empty response was
+**not** an Anthropic validation error. Hypothesis #1 ("must define `tools`") was
+*disproved* — a bare `client.messages.stream(...)` without `tools` streams text fine.
+
+The real defect was the **async bridge** in Phase 2. `_sync_stream_wrapper` ran the
+**synchronous** streaming SDK inside a `run_in_executor` worker thread while the
+asyncio loop ran on the main thread. The SDK's streaming internals raised
+`RuntimeError: Event loop is closed` inside that thread. That error was then
+**silently swallowed** by `elif kind == "error": break` (it discarded the payload),
+so the generator yielded zero tokens → `data: [DONE]` with nothing before it.
+
+Reproduced deterministically by driving the real `run_agent` with a stubbed tool:
+`message_start → tool_call → tool_result → message_end` and **0 token events**.
+
+**Fix (`api/agent.py`):**
+1. Switched `make_client` to **`AsyncAnthropic`** and `run_agent` to **native async
+   streaming** (`async with client.messages.stream(...) as stream: async for text in
+   stream.text_stream`). This deletes the thread + `asyncio.Queue` bridge entirely —
+   no more "Event loop is closed". Verified live: 47 token fragments / 612 chars (was 0).
+2. **Errors are surfaced, never swallowed** — a streaming failure now logs and yields a
+   spoken apology so the avatar is never silently mute.
+3. **Immediate acknowledgement token** ("Let me check the Company Brain for that.") is
+   emitted before the RAG pipeline so Beyond Presence receives a first byte in ~0.1 s,
+   keeping the avatar alive through the ~10 s retrieval latency.
+
+Regression coverage: `tests/test_agent.py` (fake `AsyncAnthropic`, no network) — streams
+after a tool round, emits the ack first, surfaces stream errors, handles direct answers
+and greetings.
+
+The original investigation notes are kept below for context.
 
 ---
 

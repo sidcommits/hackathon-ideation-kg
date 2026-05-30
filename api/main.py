@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Path, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 import httpx
@@ -383,6 +383,13 @@ class BPCompletionsRequest(BaseModel):
 async def chat_completions(req: BPCompletionsRequest):
     settings = get_settings()
 
+    # Boundary log: proves whether Beyond Presence actually reaches this endpoint
+    # and in which mode. If you talk to the avatar and this line never prints, BP
+    # is pointed at a stale tunnel / unregistered agent — re-run /api/register-agent.
+    _last = next((m.content for m in reversed(req.messages) if m.role == "user"), "")
+    print(f"[/v1/chat/completions] HIT stream={req.stream} "
+          f"msgs={len(req.messages)} last_user={(_last or '')[:80]!r}")
+
     # Resolve active call and clearance level
     call_id = deps.CURRENT_ACTIVE_CALL_ID
     active_call = deps.ACTIVE_CALLS.get(call_id) if call_id else None
@@ -394,15 +401,19 @@ async def chat_completions(req: BPCompletionsRequest):
     # Preprocess messages to be fully Anthropic-compliant
     messages_payload, system_prompt = preprocess_messages(raw_messages, SYSTEM_PROMPT)
 
-    # NOTE: We always force streaming for this endpoint regardless of req.stream.
-    # Beyond Presence has a short LLM response timeout — if we respond non-streaming,
-    # the full RAG pipeline takes 20-25 seconds and the avatar times out silently.
-    # With streaming, BP receives the first token in ~2-3 seconds and starts
-    # speaking immediately while the rest of the response streams in.
-    _ = req.stream  # acknowledged but ignored — always stream
+    # Beyond Presence hits this endpoint in BOTH modes (see installation guide §5B):
+    # `stream: true`  → it expects SSE chat.completion.chunk frames.
+    # `stream: false` → it expects ONE plain-JSON chat.completion body.
+    # A previous change forced SSE for both; when BP requested stream:false it got
+    # SSE it could not parse and the avatar FROZE. We now honour req.stream.
 
-    # Streaming response: pipe tokens to Beyond Presence lip-sync
-    async def event_source():
+    completion_id = f"chatcmpl-{uuid.uuid4()}"
+    created = int(time.time())
+    _ERR_TEXT = "Sorry, I hit a problem reaching the Company Brain. Please try again."
+
+    async def _run_pipeline():
+        """Drive the agent once; broadcast RAG events to the web SSE queue and
+        yield text for the avatar. Yields the error string on failure."""
         try:
             client = make_client(settings.anthropic_api_key)
             agen = run_agent(
@@ -415,40 +426,53 @@ async def chat_completions(req: BPCompletionsRequest):
                 model=settings.extraction_model,
                 system=system_prompt,
             )
-
             async for event in agen:
-                # 1. Broadcaster: push internal graph-reasoning and citation events to frontend queue
                 if event.type in {"tool_call", "tool_result", "citation"}:
                     if active_call:
                         active_call.event_queue.put_nowait(event)
-
-                # 2. completions stream: pipe tokens back to Beyond Presence lip-sync
                 elif event.type == "token":
-                    chunk = {
-                        "id": f"chatcmpl-{uuid.uuid4()}",
-                        "object": "chat.completion.chunk",
-                        "created": int(time.time()),
-                        "model": settings.extraction_model,
-                        "choices": [{
-                            "index": 0,
-                            "delta": {
-                                "content": event.text
-                            },
-                            "finish_reason": None
-                        }]
-                    }
-                    yield f"data: {json.dumps(chunk)}\n\n"
-
-            yield "data: [DONE]\n\n"
-
+                    yield event.text
         except Exception as exc:
-            err_chunk = {
-                "error": {
-                    "message": str(exc),
-                    "type": "server_error"
-                }
-            }
-            yield f"data: {json.dumps(err_chunk)}\n\n"
+            print(f"[chat_completions] pipeline failed: {exc!r}")
+            yield _ERR_TEXT
 
-    return StreamingResponse(event_source(), media_type="text/event-stream")
+    def _chunk(delta: dict, finish_reason=None) -> str:
+        payload = {
+            "id": completion_id,
+            "object": "chat.completion.chunk",
+            "created": created,
+            "model": settings.extraction_model,
+            "choices": [{"index": 0, "delta": delta, "finish_reason": finish_reason}],
+        }
+        return f"data: {json.dumps(payload)}\n\n"
+
+    # ── Streaming mode (stream: true) ─────────────────────────────────────────
+    # Canonical OpenAI sequence or the avatar freezes waiting for end-of-turn:
+    #   role opener → content deltas → finish_reason="stop" → data: [DONE].
+    async def event_source():
+        yield _chunk({"role": "assistant", "content": ""})
+        async for text in _run_pipeline():
+            yield _chunk({"content": text})
+        yield _chunk({}, finish_reason="stop")
+        yield "data: [DONE]\n\n"
+
+    if req.stream:
+        return StreamingResponse(event_source(), media_type="text/event-stream")
+
+    # ── Non-streaming mode (stream: false) ────────────────────────────────────
+    # BP blocks for one JSON chat.completion object. RAG events are still published
+    # to the web SSE queue inside _run_pipeline before we return.
+    parts = [text async for text in _run_pipeline()]
+    content = "".join(parts) or _ERR_TEXT
+    return JSONResponse({
+        "id": completion_id,
+        "object": "chat.completion",
+        "created": created,
+        "model": settings.extraction_model,
+        "choices": [{
+            "index": 0,
+            "message": {"role": "assistant", "content": content},
+            "finish_reason": "stop",
+        }],
+    })
 

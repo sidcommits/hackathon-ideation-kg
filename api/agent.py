@@ -1,14 +1,11 @@
 import asyncio
 import re
 
-from anthropic import Anthropic
+from anthropic import AsyncAnthropic
 
-from api import tools as tools_mod
 from api.events import (
     Citation, MessageEnd, MessageStart, Token, ToolCall, ToolResult,
 )
-
-MAX_TURNS = 6
 
 # Simple conversational patterns that should skip the full RAG pipeline
 # and respond instantly so Beyond Presence avatar doesn't time out.
@@ -21,39 +18,14 @@ _GREETING_REPLY = (
     "I can answer questions about MiFID II, SFDR, EU Taxonomy, FATCA, and other "
     "regulatory frameworks. What would you like to explore today?"
 )
+# Spoken immediately on substantive questions so Beyond Presence receives a token
+# within its short response window while retrieval + synthesis run behind it.
+_ACK_REPLY = "Let me check the Company Brain for that. "
 
 
 def _chunk_text(text: str, size: int = 24):
     for i in range(0, len(text), size):
         yield text[i:i + size]
-
-
-async def _stream_claude(client, params: dict, token_queue: asyncio.Queue):
-    """Thread target: stream Claude tokens into token_queue in real time."""
-    loop = asyncio.get_event_loop()
-    collected_content = []
-    stop_reason = "end_turn"
-    try:
-        with client.messages.stream(**params) as stream:
-            for text_chunk in stream.text_stream:
-                loop.call_soon_threadsafe(token_queue.put_nowait, ("token", text_chunk))
-            final = stream.get_final_message()
-            stop_reason = final.stop_reason or "end_turn"
-            for block in final.content:
-                btype = getattr(block, "type", None)
-                if btype == "text":
-                    collected_content.append({"type": "text", "text": block.text})
-                elif btype == "tool_use":
-                    collected_content.append({
-                        "type": "tool_use", "id": block.id,
-                        "name": block.name, "input": block.input,
-                    })
-    except Exception as exc:
-        loop.call_soon_threadsafe(token_queue.put_nowait, ("error", str(exc)))
-    finally:
-        loop.call_soon_threadsafe(
-            token_queue.put_nowait, ("done", (stop_reason, collected_content))
-        )
 
 
 async def run_agent(
@@ -67,17 +39,28 @@ async def run_agent(
     model,
     system,
 ):
-    """Drive a Claude tool-use loop, yielding typed Events.
+    """Drive a single-shot RAG turn, yielding typed Events.
 
-    Latency architecture for Beyond Presence avatar:
-    - Greeting fast-path  → < 0.5 s, no LLM call.
-    - First turn          → non-streaming (must inspect tool_use blocks).
-    - After tool results  → always streaming so BP gets first token in 2-3 s.
+    Latency architecture for the Beyond Presence avatar (first token must arrive
+    inside BP's short response window, or the avatar freezes):
+
+    - Greeting fast-path     → < 0.5 s, no LLM call.
+    - Acknowledgement token  → emitted instantly so BP starts speaking.
+    - Deterministic retrieve → we call search_knowledge OURSELVES (the system
+      prompt mandates it on every question), so we skip an entire Claude
+      "decide to call a tool" round-trip (~5 s saved).
+    - Single streaming synth → ONE ``client.messages.stream`` call with the
+      retrieved passages injected into the system prompt. First real token in
+      ~3-4 s instead of ~9-13 s.
+
+    ToolCall / ToolResult / Citation events are still emitted around the
+    deterministic retrieval so the web graph-visualisation keeps working — both
+    /chat (web) and /v1/chat/completions (avatar) share this generator.
+
+    Uses ``AsyncAnthropic`` so streaming runs on the event loop directly (no
+    sync-SDK-in-a-thread bridge, which used to raise "Event loop is closed").
     """
     convo = list(messages)
-    seen_chunks: set[str] = set()
-    pending_citations: list[Citation] = []
-    tools_executed = False  # flag: have we run at least one tool round?
 
     yield MessageStart(id="msg")
 
@@ -95,144 +78,81 @@ async def run_agent(
         yield MessageEnd(stop_reason="end_turn")
         return
 
-    stop_reason = "max_turns"
+    # ── Immediate acknowledgement ─────────────────────────────────────────────
+    # First byte to BP in ~0.1 s keeps the avatar alive through retrieval latency.
+    yield Token(text=_ACK_REPLY)
 
-    for _turn in range(MAX_TURNS):
+    # ── Deterministic retrieval (replaces the Claude tool-decision turn) ───────
+    seen_chunks: set[str] = set()
+    pending_citations: list[Citation] = []
+    tu_id = "call_search_knowledge"
+    tu_args = {"query": last_user_text or ""}
+    yield ToolCall(id=tu_id, name="search_knowledge", args=tu_args)
 
-        if tools_executed:
-            # ── After tool results: stream the answer in real-time ────────────
-            # Build snapshot AFTER tool_results are in convo.
-            # No 'tools' param → forces Claude to synthesise a text answer.
-            stream_params = dict(
-                model=model,
-                max_tokens=2048,
-                system=system,
-                messages=list(convo),
-            )
+    # run_tool is blocking (embeddings + Neo4j) — keep it off the loop. It can
+    # throw (missing index, dim mismatch, network); NEVER let it propagate or the
+    # avatar freezes. Degrade to an empty result so synthesis can still speak.
+    try:
+        model_result, delta, citations = await asyncio.to_thread(
+            run_tool,
+            "search_knowledge", tu_args,
+            store=store, embedder=embedder, max_sensitivity=max_sensitivity,
+        )
+    except Exception as exc:
+        print(f"[run_agent] search_knowledge failed: {exc!r}")
+        model_result = (
+            "The knowledge base could not be reached. Tell the user you were "
+            "unable to look this up right now and to try again."
+        )
+        delta, citations = {"nodes": [], "edges": []}, []
 
-            loop = asyncio.get_event_loop()
-            token_queue: asyncio.Queue = asyncio.Queue()
-            fut = loop.run_in_executor(
-                None, _sync_stream_wrapper, client, stream_params, token_queue, loop
-            )
+    summary = model_result.splitlines()[0][:120] if model_result else "no result"
+    yield ToolResult(id=tu_id, summary=summary, graph_delta=delta)
+    for c in citations:
+        if c["chunk_id"] in seen_chunks:
+            continue
+        seen_chunks.add(c["chunk_id"])
+        pending_citations.append(Citation(
+            doc_title=c["doc_title"], sensitivity=c["sensitivity"],
+            chunk_text=c["chunk_text"],
+        ))
 
-            final_content = []
-            final_stop = "end_turn"
-            while True:
-                kind, payload = await token_queue.get()
-                if kind == "token":
-                    yield Token(text=payload)
-                elif kind == "error":
-                    break
-                elif kind == "done":
-                    final_stop, final_content = payload
-                    break
+    # ── Single streaming synthesis ────────────────────────────────────────────
+    augmented_system = (
+        f"{system}\n\n"
+        "# Retrieved context\n"
+        "Answer using ONLY the passages below. Cite the documents they came from. "
+        "If the passages are empty or irrelevant, say you could not find it — do "
+        "not invent an answer.\n\n"
+        f"{model_result}"
+    )
 
-            await fut
-
-            convo.append({"role": "assistant", "content": final_content})
-            stop_reason = final_stop
-            # If the synthesis also triggered tool_use (very rare), loop
-            tool_uses_in_answer = [b for b in final_content if b.get("type") == "tool_use"]
-            if not tool_uses_in_answer:
-                break
-            # Else continue loop to handle those tool calls next turn
-            tools_executed = False  # reset so we run non-streaming to inspect
-            assistant_content = final_content
-            tool_uses_raw = tool_uses_in_answer
-        else:
-            # ── First (or non-tool) turn: non-streaming to inspect response ───
-            msg = await asyncio.to_thread(
-                client.messages.create,
-                model=model,
-                max_tokens=2048,
-                system=system,
-                tools=tools_mod.TOOL_SCHEMAS,
-                messages=convo,
-            )
-
-            assistant_content = []
-            tool_uses_raw = []
-
-            for block in msg.content:
-                btype = getattr(block, "type", None)
-                if btype == "text":
-                    assistant_content.append({"type": "text", "text": block.text})
-                    for piece in _chunk_text(block.text):
-                        yield Token(text=piece)
-                elif btype == "tool_use":
-                    assistant_content.append(
-                        {"type": "tool_use", "id": block.id,
-                         "name": block.name, "input": block.input}
-                    )
-                    tool_uses_raw.append(block)
-
-            convo.append({"role": "assistant", "content": assistant_content})
-
-            if msg.stop_reason != "tool_use" or not tool_uses_raw:
-                stop_reason = msg.stop_reason or "end_turn"
-                break
-
-        # ── Execute tools ─────────────────────────────────────────────────────
-        tool_results_block = []
-        for tu in tool_uses_raw:
-            tu_id = tu.id if hasattr(tu, "id") else tu["id"]
-            tu_name = tu.name if hasattr(tu, "name") else tu["name"]
-            tu_input = dict(tu.input) if hasattr(tu, "input") else tu["input"]
-            yield ToolCall(id=tu_id, name=tu_name, args=tu_input)
-            model_result, delta, citations = await asyncio.to_thread(
-                run_tool,
-                tu_name, tu_input,
-                store=store, embedder=embedder, max_sensitivity=max_sensitivity,
-            )
-            summary = model_result.splitlines()[0][:120] if model_result else "no result"
-            yield ToolResult(id=tu_id, summary=summary, graph_delta=delta)
-            for c in citations:
-                if c["chunk_id"] in seen_chunks:
-                    continue
-                seen_chunks.add(c["chunk_id"])
-                pending_citations.append(Citation(
-                    doc_title=c["doc_title"], sensitivity=c["sensitivity"],
-                    chunk_text=c["chunk_text"],
-                ))
-            tool_results_block.append({
-                "type": "tool_result", "tool_use_id": tu_id, "content": model_result,
-            })
-
-        convo.append({"role": "user", "content": tool_results_block})
-        tools_executed = True  # next iteration will stream the answer
+    stop_reason = "end_turn"
+    try:
+        async with client.messages.stream(
+            model=model,
+            max_tokens=2048,
+            system=augmented_system,
+            messages=convo,
+        ) as stream:
+            async for text in stream.text_stream:
+                yield Token(text=text)
+            final = await stream.get_final_message()
+            stop_reason = final.stop_reason or "end_turn"
+    except Exception as exc:
+        # Surface, never swallow — the avatar must say something and the stream
+        # must terminate.
+        print(f"[run_agent] synthesis streaming failed: {exc!r}")
+        yield Token(
+            text="Sorry — I ran into a problem composing that answer. "
+                 "Please try again."
+        )
+        stop_reason = "error"
 
     for c in pending_citations:
         yield c
     yield MessageEnd(stop_reason=stop_reason)
 
 
-def _sync_stream_wrapper(client, params, token_queue, loop):
-    """Synchronous wrapper around the streaming SDK call, run in a thread."""
-    collected_content = []
-    stop_reason = "end_turn"
-    try:
-        with client.messages.stream(**params) as stream:
-            for text_chunk in stream.text_stream:
-                loop.call_soon_threadsafe(token_queue.put_nowait, ("token", text_chunk))
-            final = stream.get_final_message()
-            stop_reason = final.stop_reason or "end_turn"
-            for block in final.content:
-                btype = getattr(block, "type", None)
-                if btype == "text":
-                    collected_content.append({"type": "text", "text": block.text})
-                elif btype == "tool_use":
-                    collected_content.append({
-                        "type": "tool_use", "id": block.id,
-                        "name": block.name, "input": block.input,
-                    })
-    except Exception as exc:
-        loop.call_soon_threadsafe(token_queue.put_nowait, ("error", str(exc)))
-    finally:
-        loop.call_soon_threadsafe(
-            token_queue.put_nowait, ("done", (stop_reason, collected_content))
-        )
-
-
-def make_client(api_key: str) -> Anthropic:
-    return Anthropic(api_key=api_key)
+def make_client(api_key: str) -> AsyncAnthropic:
+    return AsyncAnthropic(api_key=api_key)

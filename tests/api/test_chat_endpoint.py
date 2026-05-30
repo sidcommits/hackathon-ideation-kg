@@ -81,23 +81,28 @@ def test_v1_chat_completions_streaming(monkeypatch):
 
     client = TestClient(app)
     resp = client.post("/v1/chat/completions", json={
-        "messages": [{"role": "system", "content": "you are a helper"}, {"role": "user", "content": "hi"}],
+        "messages": [{"role": "system", "content": "you are a helper"},
+                     {"role": "user", "content": "hi"}],
         "stream": True
     })
     assert resp.status_code == 200
     assert "text/event-stream" in resp.headers["content-type"]
-    
-    # Parse SSE chunks
-    text_chunks = []
-    for line in resp.text.splitlines():
-        if line.startswith("data: ") and not line.endswith("[DONE]"):
-            data = json.loads(line[len("data: "):])
-            if "choices" in data:
-                text_chunks.append(data["choices"][0]["delta"].get("content", ""))
-    assert "".join(text_chunks) == "hello there"
+
+    chunks = [json.loads(l[len("data: "):]) for l in resp.text.splitlines()
+              if l.startswith("data: ") and not l.endswith("[DONE]")]
+    deltas = [c["choices"][0]["delta"] for c in chunks]
+    # Beyond Presence needs the canonical OpenAI sequence or the avatar freezes:
+    assert deltas[0].get("role") == "assistant"                 # 1) role opener
+    body = "".join(d.get("content", "") for d in deltas)
+    assert body == "hello there"                                # 2) content
+    assert chunks[-1]["choices"][0]["finish_reason"] == "stop"  # 3) terminal stop
+    assert resp.text.rstrip().endswith("[DONE]")                # 4) [DONE] last
+    assert len({c["id"] for c in chunks}) == 1                  # one shared id
 
 
-def test_v1_chat_completions_non_streaming(monkeypatch):
+def test_v1_chat_completions_non_streaming_returns_json(monkeypatch):
+    """When BP requests stream:false it expects ONE plain-JSON chat.completion
+    body (not SSE). Returning SSE here froze the avatar."""
     from api.events import MessageStart, Token, MessageEnd
 
     async def fake_agent(messages, **kw):
@@ -116,4 +121,33 @@ def test_v1_chat_completions_non_streaming(monkeypatch):
     assert resp.status_code == 200
     assert "application/json" in resp.headers["content-type"]
     data = resp.json()
+    assert data["object"] == "chat.completion"
+    assert data["choices"][0]["message"]["role"] == "assistant"
     assert data["choices"][0]["message"]["content"] == "hello there"
+    assert data["choices"][0]["finish_reason"] == "stop"
+
+
+def test_v1_chat_completions_failure_does_not_freeze(monkeypatch):
+    """If the agent pipeline raises, the endpoint must still emit a valid OpenAI
+    content chunk AND terminate with [DONE] — never a bare {"error"} with no
+    terminator, which leaves Beyond Presence's avatar frozen."""
+    async def boom_agent(messages, **kw):
+        yield  # make this an async generator
+        raise RuntimeError("vector index chunk_vec not found")
+
+    monkeypatch.setattr(main, "run_agent", boom_agent)
+
+    client = TestClient(app)
+    resp = client.post("/v1/chat/completions", json={
+        "messages": [{"role": "user", "content": "What is MiFID II?"}],
+        "stream": True,
+    })
+    assert resp.status_code == 200
+    assert "[DONE]" in resp.text  # stream is terminated → avatar never freezes
+    chunks = [json.loads(l[len("data: "):]) for l in resp.text.splitlines()
+              if l.startswith("data: ") and not l.endswith("[DONE]")]
+    assert chunks and "choices" in chunks[-1]
+    spoken = "".join(c["choices"][0]["delta"].get("content", "") for c in chunks)
+    assert "Sorry" in spoken
+    # Even on failure the turn must be properly closed for BP.
+    assert chunks[-1]["choices"][0]["finish_reason"] == "stop"

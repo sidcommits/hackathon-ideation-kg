@@ -1,108 +1,237 @@
-import asyncio
+import pytest
 
 from api.agent import run_agent
-from api.events import MessageStart, Token, ToolCall, ToolResult, Citation, MessageEnd
+from api.events import MessageStart, MessageEnd, Token, ToolCall, ToolResult, Citation
 
 
+# ── Fakes (mirror the AsyncAnthropic contract) ───────────────────────────────
 class _Block:
+    """Mimics an Anthropic content block (text or tool_use)."""
     def __init__(self, **kw):
         self.__dict__.update(kw)
 
 
 class _FakeMessage:
-    """Mimics anthropic Message: .content (list of blocks) + .stop_reason."""
     def __init__(self, content, stop_reason):
         self.content = content
         self.stop_reason = stop_reason
 
 
-class _FakeMessages:
-    """First call -> tool_use; second call -> final text."""
-    def __init__(self):
-        self._calls = 0
+class _FakeStream:
+    """Async context manager mirroring client.messages.stream(...)."""
+    def __init__(self, message, raises=None):
+        self._message = message
+        self._raises = raises
 
-    def create(self, **kw):
-        self._calls += 1
-        if self._calls == 1:
-            return _FakeMessage(
-                [_Block(type="tool_use", id="tc_1", name="search_knowledge",
-                        input={"query": "structured note"})],
-                stop_reason="tool_use",
-            )
-        return _FakeMessage(
-            [_Block(type="text", text="A structured note is complex under MiFID II.")],
-            stop_reason="end_turn",
-        )
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    @property
+    def text_stream(self):
+        message, raises = self._message, self._raises
+
+        async def gen():
+            if raises:
+                raise raises
+            for block in message.content:
+                if getattr(block, "type", None) == "text":
+                    yield block.text
+
+        return gen()
+
+    async def get_final_message(self):
+        return self._message
+
+
+class _FakeMessages:
+    """Single-shot RAG only streams once; create() should never be called."""
+    def __init__(self, stream_message, stream_raises=None):
+        self._stream_message = stream_message
+        self._stream_raises = stream_raises
+        self.create_calls = []
+        self.stream_calls = []
+
+    async def create(self, **kwargs):  # pragma: no cover - must not be reached
+        self.create_calls.append(kwargs)
+        raise AssertionError("run_agent must not make a non-streaming Turn-1 call")
+
+    def stream(self, **kwargs):
+        self.stream_calls.append(kwargs)
+        return _FakeStream(self._stream_message, raises=self._stream_raises)
 
 
 class _FakeClient:
-    def __init__(self):
-        self.messages = _FakeMessages()
+    def __init__(self, answer_text, stop_reason="end_turn", stream_raises=None):
+        msg = _FakeMessage(content=[_Block(type="text", text=answer_text)],
+                           stop_reason=stop_reason)
+        self.messages = _FakeMessages(msg, stream_raises=stream_raises)
 
 
-def _fake_run_tool(name, args, **kw):
-    return ("ESMA passage about structured notes",
-            {"nodes": [{"id": "Chunk:c1", "label": "Chunk"}], "edges": []},
-            [{"doc_title": "ESMA", "doc_id": "d1", "chunk_id": "c1",
-              "sensitivity": "C2 Internal", "chunk_text": "..."}])
+def _text_block(text):
+    return _Block(type="text", text=text)
 
 
-def _collect(messages, **kw):
-    async def go():
-        return [e async for e in run_agent(messages, **kw)]
-    return asyncio.run(go())
+def _make_tool_runner(model_result, delta=None, citations=None):
+    delta = delta if delta is not None else {"nodes": [], "edges": []}
+    citations = citations if citations is not None else []
+    calls = []
+
+    def run_tool(name, args, *, store, embedder, max_sensitivity):
+        calls.append((name, args))
+        return model_result, delta, citations
+
+    run_tool.calls = calls
+    return run_tool
 
 
-def test_agent_emits_well_formed_sequence():
-    events = _collect(
-        [{"role": "user", "content": "is a structured note complex?"}],
-        client=_FakeClient(), run_tool=_fake_run_tool,
-        store=None, embedder=None, max_sensitivity="C2 Internal",
-        model="claude-test", system="sys",
+async def _collect(agen):
+    return [event async for event in agen]
+
+
+@pytest.fixture
+def base_kwargs():
+    return dict(
+        store=object(),
+        embedder=object(),
+        max_sensitivity="C2 Internal",
+        model="claude-x",
+        system="SYS",
     )
-    types = [e.type for e in events]
-    assert types[0] == "message_start"
-    assert types[-1] == "message_end"
-    assert "tool_call" in types and "tool_result" in types and "token" in types
-    tr = next(e for e in events if e.type == "tool_result")
-    assert tr.graph_delta["nodes"][0]["id"] == "Chunk:c1"
-    assert "citation" in types
-    assert types.index("citation") < types.index("message_end")
 
 
-def test_agent_dedupes_citations_by_chunk_id():
-    events = _collect(
+@pytest.mark.asyncio
+async def test_single_shot_emits_well_formed_sequence(base_kwargs):
+    client = _FakeClient("Structured notes are covered under MiFID II.")
+    run_tool = _make_tool_runner(
+        "MiFID II covers structured notes.",
+        {"nodes": [{"id": "n1"}], "edges": []},
+        [{"chunk_id": "c1", "doc_title": "MiFID Guide",
+          "sensitivity": "C2 Internal", "chunk_text": "..."}],
+    )
+
+    events = await _collect(run_agent(
+        [{"role": "user", "content": "Are structured notes covered?"}],
+        client=client, run_tool=run_tool, **base_kwargs,
+    ))
+
+    types = [type(e).__name__ for e in events]
+    assert types[0] == "MessageStart"
+    assert "ToolCall" in types and "ToolResult" in types and "Citation" in types
+    assert types[-1] == "MessageEnd"
+    # Retrieval drives synthesis: tool round before the streamed answer.
+    assert types.index("ToolCall") < types.index("MessageEnd")
+    answer = "".join(e.text for e in events if isinstance(e, Token))
+    assert "Structured notes are covered under MiFID II." in answer
+
+
+@pytest.mark.asyncio
+async def test_no_turn1_only_one_streaming_call(base_kwargs):
+    """The latency win: NO non-streaming decision turn, exactly ONE stream call,
+    and we drive retrieval ourselves (search_knowledge) rather than asking Claude."""
+    client = _FakeClient("Answer.")
+    run_tool = _make_tool_runner("ctx")
+    await _collect(run_agent(
+        [{"role": "user", "content": "What is MiFID II?"}],
+        client=client, run_tool=run_tool, **base_kwargs,
+    ))
+    assert client.messages.create_calls == []          # no Turn 1
+    assert len(client.messages.stream_calls) == 1       # single synthesis call
+    assert run_tool.calls and run_tool.calls[0][0] == "search_knowledge"
+    # We embed the user's question directly.
+    assert run_tool.calls[0][1]["query"] == "What is MiFID II?"
+
+
+@pytest.mark.asyncio
+async def test_retrieved_context_injected_into_system(base_kwargs):
+    client = _FakeClient("Answer.")
+    run_tool = _make_tool_runner("RETRIEVED_PASSAGE_XYZ")
+    await _collect(run_agent(
         [{"role": "user", "content": "q"}],
-        client=_FakeClient(), run_tool=_fake_run_tool,
-        store=None, embedder=None, max_sensitivity="C2 Internal",
-        model="claude-test", system="sys",
+        client=client, run_tool=run_tool, **base_kwargs,
+    ))
+    sys_arg = client.messages.stream_calls[0]["system"]
+    assert "RETRIEVED_PASSAGE_XYZ" in sys_arg
+    assert "SYS" in sys_arg  # base system prompt preserved
+
+
+@pytest.mark.asyncio
+async def test_acknowledgement_token_precedes_pipeline(base_kwargs):
+    """An immediate token must reach Beyond Presence before retrieval so the
+    avatar starts speaking inside BP's response window."""
+    client = _FakeClient("Answer.")
+    run_tool = _make_tool_runner("ctx")
+    events = await _collect(run_agent(
+        [{"role": "user", "content": "What is MiFID II?"}],
+        client=client, run_tool=run_tool, **base_kwargs,
+    ))
+    types = [type(e).__name__ for e in events]
+    assert types.index("Token") < types.index("ToolCall")
+
+
+@pytest.mark.asyncio
+async def test_stream_error_is_surfaced_not_swallowed(base_kwargs):
+    """If synthesis streaming fails, the avatar must still say something and end."""
+    client = _FakeClient("", stream_raises=RuntimeError("Event loop is closed"))
+    run_tool = _make_tool_runner("ctx")
+    events = await _collect(run_agent(
+        [{"role": "user", "content": "What is MiFID II?"}],
+        client=client, run_tool=run_tool, **base_kwargs,
+    ))
+    spoken = " ".join(e.text.lower() for e in events if isinstance(e, Token))
+    assert "sorry" in spoken or "problem" in spoken
+    assert isinstance(events[-1], MessageEnd)
+
+
+@pytest.mark.asyncio
+async def test_tool_failure_does_not_freeze_and_still_streams(base_kwargs):
+    """A throwing retrieval (missing index / dim mismatch) must NOT propagate —
+    synthesis still runs and the stream still terminates, never freezing."""
+    client = _FakeClient("I could not reach the knowledge base.")
+
+    def boom_tool(name, args, *, store, embedder, max_sensitivity):
+        raise RuntimeError("There is no such vector schema index: chunk_vec")
+
+    events = await _collect(run_agent(
+        [{"role": "user", "content": "What is MiFID II?"}],
+        client=client, run_tool=boom_tool, **base_kwargs,
+    ))
+    assert any(isinstance(e, ToolResult) for e in events)
+    assert "".join(e.text for e in events if isinstance(e, Token))  # spoke something
+    assert isinstance(events[-1], MessageEnd)
+
+
+@pytest.mark.asyncio
+async def test_greeting_fast_path_skips_everything(base_kwargs):
+    """Greetings answer instantly: no client call, no retrieval."""
+    run_tool = _make_tool_runner("ctx")
+    events = await _collect(run_agent(
+        [{"role": "user", "content": "hello"}],
+        client=None, run_tool=run_tool, **base_kwargs,
+    ))
+    spoken = "".join(e.text for e in events if isinstance(e, Token))
+    assert "SIX Corporate Advisor" in spoken
+    assert not run_tool.calls
+    assert not any(isinstance(e, ToolCall) for e in events)
+    assert isinstance(events[-1], MessageEnd)
+
+
+@pytest.mark.asyncio
+async def test_citations_deduped_by_chunk_id(base_kwargs):
+    client = _FakeClient("Answer.")
+    run_tool = _make_tool_runner(
+        "ctx", {"nodes": [], "edges": []},
+        [
+            {"chunk_id": "dup", "doc_title": "Doc", "sensitivity": "C2 Internal", "chunk_text": "x"},
+            {"chunk_id": "dup", "doc_title": "Doc", "sensitivity": "C2 Internal", "chunk_text": "x"},
+            {"chunk_id": "other", "doc_title": "Doc2", "sensitivity": "C2 Internal", "chunk_text": "y"},
+        ],
     )
-    cites = [e for e in events if e.type == "citation"]
-    assert len({c.chunk_text for c in cites}) == len(cites)
-
-
-class _AlwaysToolMessages:
-    def create(self, **kw):
-        class _B:
-            type = "tool_use"; id = "tc"; name = "search_knowledge"; input = {"query": "x"}
-        class _M:
-            content = [_B()]; stop_reason = "tool_use"
-        return _M()
-
-
-class _AlwaysToolClient:
-    def __init__(self):
-        self.messages = _AlwaysToolMessages()
-
-
-def test_agent_marks_max_turns_exhaustion():
-    events = _collect(
-        [{"role": "user", "content": "loop forever"}],
-        client=_AlwaysToolClient(), run_tool=_fake_run_tool,
-        store=None, embedder=None, max_sensitivity="C2 Internal",
-        model="claude-test", system="sys",
-    )
-    assert events[0].type == "message_start"
-    end = events[-1]
-    assert end.type == "message_end"
-    assert end.stop_reason == "max_turns"
+    events = await _collect(run_agent(
+        [{"role": "user", "content": "q"}],
+        client=client, run_tool=run_tool, **base_kwargs,
+    ))
+    cites = [e for e in events if isinstance(e, Citation)]
+    assert len(cites) == 2  # deduped by chunk_id
