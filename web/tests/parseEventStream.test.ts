@@ -34,4 +34,23 @@ describe("parseSSEChunk", () => {
     expect(second.events).toHaveLength(1);
     expect(second.events[0]).toMatchObject({ type: "token", text: "b" });
   });
+
+  it("parses CRLF frame separators (the real sse-starlette backend format)", () => {
+    // sse-starlette emits `data: {...}\r\n\r\n`, not `\n\n`. This is the exact
+    // wire format that broke the live frontend before normalization was added.
+    const { events, rest } = parseSSEChunk(
+      'data: {"type":"message_start","id":"msg"}\r\n\r\ndata: {"type":"token","text":"hi"}\r\n\r\n',
+    );
+    expect(events).toHaveLength(2);
+    expect(events[0]).toMatchObject({ type: "message_start", id: "msg" });
+    expect(events[1]).toMatchObject({ type: "token", text: "hi" });
+    expect(rest).toBe("");
+  });
+
+  it("reassembles a CRLF frame whose separator is split across two reads", () => {
+    const first = parseSSEChunk('data: {"type":"token","text":"a"}\r');
+    expect(first.events).toHaveLength(0); // separator incomplete
+    const second = parseSSEChunk(first.rest + '\n\r\ndata: {"type":"token","text":"b"}\r\n\r\n');
+    expect(second.events.map((e) => (e as { text: string }).text)).toEqual(["a", "b"]);
+  });
 });

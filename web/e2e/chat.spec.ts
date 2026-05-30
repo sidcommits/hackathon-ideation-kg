@@ -7,7 +7,7 @@ const SSE_BODY = [
   'data: {"type":"token","text":"A structured note is complex under MiFID II."}',
   'data: {"type":"citation","doc_title":"ESMA 2015-1787","sensitivity":"C2 Internal","chunk_text":"..."}',
   'data: {"type":"message_end","stop_reason":"end_turn"}',
-].join("\n\n") + "\n\n";
+].join("\r\n\r\n") + "\r\n\r\n";   // CRLF — mirror the real sse-starlette wire format
 
 test("renders a full chat turn", async ({ page }) => {
   await page.route("**/chat", (route) =>
