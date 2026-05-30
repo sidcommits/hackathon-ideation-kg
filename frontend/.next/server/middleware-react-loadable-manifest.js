@@ -1,0 +1,1 @@
+self.__REACT_LOADABLE_MANIFEST="{\"components/ChatInterface.tsx -> ./BrainCanvas\":{\"id\":\"components/ChatInterface.tsx -> ./BrainCanvas\",\"files\":[\"static/chunks/_app-pages-browser_components_BrainCanvas_tsx.js\"]}}"
