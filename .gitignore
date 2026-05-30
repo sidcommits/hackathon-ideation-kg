@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+.next/
+.neo4j/
+*.pdf
+*.xlsx
+*.docx
+*.pptx
+.env
+.env.example
+.bp_agent_cache.json
+localtunnel.log
+corpus/

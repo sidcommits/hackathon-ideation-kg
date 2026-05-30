@@ -1,0 +1,30 @@
+{
+  "root": {
+    "id": "root",
+    "label": "Is this instrument covered?",
+    "children": [
+      {
+        "id": "mifid",
+        "label": "MiFID II Scope Check",
+        "children": [
+          { "id": "complex", "label": "Is it a complex instrument?\n✓ Structured note → YES" },
+          { "id": "esg", "label": "ESG-linked?\n✓ Taxonomy-aligned → In scope" },
+          { "id": "exempted", "label": "Prof. client exemption?\n✗ No evidence → Ruled out", "eliminated": true }
+        ]
+      },
+      {
+        "id": "sfdr",
+        "label": "SFDR Applicability",
+        "children": [
+          { "id": "sfdr_article8", "label": "Article 8 (light green)\n✓ ESG integration → Applies" },
+          { "id": "sfdr_article9", "label": "Article 9 (dark green)\n✗ Not impact-focused → Ruled out", "eliminated": true }
+        ]
+      },
+      {
+        "id": "fatca",
+        "label": "FATCA Reporting?\n✗ Non-US issuer → Ruled out",
+        "eliminated": true
+      }
+    ]
+  }
+}
