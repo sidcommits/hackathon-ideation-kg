@@ -23,7 +23,7 @@ export function ClearanceSelector({ value, onChange, disabled }: ClearanceSelect
 
   return (
     <div className="flex items-center gap-2.5">
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-[color:var(--fg-3)]">
+      <span className="text-[length:var(--text-xs)] font-semibold uppercase tracking-wider text-[color:var(--fg-3)]">
         Clearance:
       </span>
       <div className="relative inline-block text-left">

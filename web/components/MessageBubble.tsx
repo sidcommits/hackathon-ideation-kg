@@ -19,8 +19,8 @@ export function MessageBubble({
       <div
         className={
           isUser
-            ? "max-w-[82%] rounded-2xl rounded-br-md border border-[color:var(--accent-dim)]/40 bg-[color:var(--accent-dim)]/15 px-4 py-2.5 text-[15px] leading-relaxed text-[color:var(--fg)]"
-            : "glass max-w-[88%] rounded-2xl rounded-tl-md px-4 py-3 text-[15px] leading-relaxed text-[color:var(--fg)]"
+            ? "max-w-[82%] rounded-2xl rounded-br-md border border-[color:var(--accent-dim)]/40 bg-[color:var(--accent-dim)]/15 px-4 py-2.5 text-[length:var(--text-md)] leading-relaxed text-[color:var(--fg)]"
+            : "glass max-w-[88%] rounded-2xl rounded-tl-md px-4 py-3 text-[length:var(--text-md)] leading-relaxed text-[color:var(--fg)]"
         }
       >
         {isUser ? (
@@ -43,14 +43,14 @@ export function MessageBubble({
         {m.citations && m.citations.length > 0 && (
           <div className="mt-3 flex flex-col gap-2 border-t border-[color:var(--line)] pt-3">
             <div className="flex items-center justify-between gap-2">
-              <span className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-[color:var(--fg-3)]">
+              <span className="font-mono text-[length:var(--text-2xs)] uppercase tracking-[0.18em] text-[color:var(--fg-3)]">
                 Sources
               </span>
               {onOpenSources && (
                 <button
                   type="button"
                   onClick={() => onOpenSources(m)}
-                  className="flex items-center gap-1 rounded-md border border-[color:var(--line)] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-[color:var(--fg-3)] transition-colors hover:border-[color:var(--accent-dim)] hover:text-[color:var(--accent)] cursor-pointer"
+                  className="flex items-center gap-1 rounded-md border border-[color:var(--line)] px-1.5 py-0.5 font-mono text-[length:var(--text-2xs)] uppercase tracking-wider text-[color:var(--fg-3)] transition-colors hover:border-[color:var(--accent-dim)] hover:text-[color:var(--accent)] cursor-pointer"
                   title="View sources & relations as a tree"
                 >
                   Tree view

@@ -41,19 +41,19 @@ function GraphFallback({ graph }: { graph: GraphState }) {
 
   return (
     <div className="flex h-full w-full flex-col p-6 bg-[color:var(--bg)] text-left">
-      <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[color:var(--fg-3)] mb-4">
+      <span className="font-mono text-[length:var(--text-xs)] uppercase tracking-[0.2em] text-[color:var(--fg-3)] mb-4">
         Knowledge Map (Accessibility View)
       </span>
       {empty ? (
         <div className="flex-1 flex items-center justify-center text-center px-4">
-          <p className="max-w-[220px] text-[12px] leading-relaxed text-[color:var(--fg-3)]">
+          <p className="max-w-[220px] text-[length:var(--text-sm)] leading-relaxed text-[color:var(--fg-3)]">
             As the brain reasons, the entities and sources it traverses light up here — a live map of what it knows.
           </p>
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto flex flex-col gap-4 pr-2 select-text pointer-events-auto">
           <div>
-            <h4 className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--fg-3)] mb-2">
+            <h4 className="text-[length:var(--text-xs)] font-bold uppercase tracking-wider text-[color:var(--fg-3)] mb-2">
               Discovered Entities ({graph.nodes.length})
             </h4>
             <div className="flex flex-wrap gap-1.5">
@@ -80,7 +80,7 @@ function GraphFallback({ graph }: { graph: GraphState }) {
 
           {graph.edges.length > 0 && (
             <div>
-              <h4 className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--fg-3)] mb-2">
+              <h4 className="text-[length:var(--text-xs)] font-bold uppercase tracking-wider text-[color:var(--fg-3)] mb-2">
                 Active Relations ({graph.edges.length})
               </h4>
               <div className="flex flex-col gap-1.5">
@@ -90,7 +90,7 @@ function GraphFallback({ graph }: { graph: GraphState }) {
                   return (
                     <div key={idx} className="flex items-center gap-2 text-xs text-[color:var(--fg-2)]">
                       <span className="font-medium truncate max-w-[120px]">{fromName}</span>
-                      <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider text-[color:var(--fg-3)] px-1.5 py-0.5 rounded border border-[color:var(--line)] bg-[color:var(--bg-2)]">
+                      <span className="shrink-0 font-mono text-[length:var(--text-2xs)] uppercase tracking-wider text-[color:var(--fg-3)] px-1.5 py-0.5 rounded border border-[color:var(--line)] bg-[color:var(--bg-2)]">
                         {e.rel}
                       </span>
                       <span className="font-medium truncate max-w-[120px]">{toName}</span>
@@ -229,11 +229,11 @@ export function GraphCanvas({ graph }: { graph: GraphState }) {
     <div ref={wrapRef} className="relative h-full w-full overflow-hidden">
       {/* Header */}
       <div className="pointer-events-none absolute left-4 top-3.5 z-10 flex items-center gap-2">
-        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[color:var(--fg-3)]">
+        <span className="font-mono text-[length:var(--text-xs)] uppercase tracking-[0.2em] text-[color:var(--fg-3)]">
           Knowledge Graph
         </span>
         {!empty && (
-          <span className="rounded-full border border-[color:var(--line)] bg-[color:var(--bg-2)]/80 px-2 py-0.5 font-mono text-[9.5px] text-[color:var(--fg-3)] backdrop-blur-sm">
+          <span className="rounded-full border border-[color:var(--line)] bg-[color:var(--bg-2)]/80 px-2 py-0.5 font-mono text-[length:var(--text-2xs)] text-[color:var(--fg-3)] backdrop-blur-sm">
             {graph.nodes.length} nodes · {graph.edges.length} edges
           </span>
         )}
@@ -247,10 +247,10 @@ export function GraphCanvas({ graph }: { graph: GraphState }) {
               className="h-2 w-2 rounded-full"
               style={{ background: l.color, boxShadow: `0 0 7px ${l.color}66` }}
             />
-            <span className="w-[68px] text-[11px] font-medium text-[color:var(--fg-2)]">
+            <span className="w-[68px] text-[length:var(--text-sm)] font-medium text-[color:var(--fg-2)]">
               {l.label}
             </span>
-            <span className="font-mono text-[9px] text-[color:var(--fg-3)]">{l.kinds}</span>
+            <span className="font-mono text-[length:var(--text-2xs)] text-[color:var(--fg-3)]">{l.kinds}</span>
           </div>
         ))}
       </div>
@@ -291,7 +291,7 @@ export function GraphCanvas({ graph }: { graph: GraphState }) {
       {/* Empty state */}
       {empty && (
         <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center px-8 text-center">
-          <p className="max-w-[220px] text-[12px] leading-relaxed text-[color:var(--fg-3)]">
+          <p className="max-w-[220px] text-[length:var(--text-sm)] leading-relaxed text-[color:var(--fg-3)]">
             As the brain reasons, the entities and sources it traverses light up
             here — a live map of what it knows.
           </p>

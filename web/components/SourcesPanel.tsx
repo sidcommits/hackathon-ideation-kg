@@ -51,7 +51,7 @@ function SensitivityDot({ sensitivity }: { sensitivity: string }) {
   return (
     <span className="ml-auto flex shrink-0 items-center gap-1">
       <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
-      <span className="font-mono text-[8.5px] uppercase tracking-[0.1em]" style={{ color }}>
+      <span className="font-mono text-[length:var(--text-2xs)] uppercase tracking-[0.1em]" style={{ color }}>
         {sensitivity}
       </span>
     </span>
@@ -113,7 +113,7 @@ function SourcesTree({ message }: { message: Message }) {
     });
 
   if (tree.length === 0) {
-    return <p className="px-1 py-2 text-[11px] text-[color:var(--fg-3)]">No sources cited.</p>;
+    return <p className="px-1 py-2 text-[length:var(--text-sm)] text-[color:var(--fg-3)]">No sources cited.</p>;
   }
 
   const ROW_PAD = [0, 14, 28, 42];
@@ -129,7 +129,7 @@ function SourcesTree({ message }: { message: Message }) {
         <p
           key={key}
           style={{ paddingLeft: pad + 18 }}
-          className="border-l border-[color:var(--line-2)] py-0.5 pr-2 text-[11px] leading-relaxed text-[color:var(--fg-2)]"
+          className="border-l border-[color:var(--line-2)] py-0.5 pr-2 text-[length:var(--text-sm)] leading-relaxed text-[color:var(--fg-2)]"
         >
           {node.label.length > 200 ? node.label.slice(0, 200) + "…" : node.label}
         </p>
@@ -158,13 +158,13 @@ function SourcesTree({ message }: { message: Message }) {
           <NodeGlyph kind={node.kind} label={node.label} />
           <span
             className={`min-w-0 flex-1 truncate ${
-              isDoc ? "font-mono text-[11px] text-[color:var(--fg-2)]" : "text-[12px] font-medium text-[color:var(--fg)]"
+              isDoc ? "font-mono text-[length:var(--text-sm)] text-[color:var(--fg-2)]" : "text-[length:var(--text-sm)] font-medium text-[color:var(--fg)]"
             }`}
           >
             {node.label}
           </span>
           {isDoc && (
-            <span className="shrink-0 rounded-full bg-[color:var(--bg-3)] px-1.5 py-0.5 font-mono text-[8.5px] text-[color:var(--fg-3)]">
+            <span className="shrink-0 rounded-full bg-[color:var(--bg-3)] px-1.5 py-0.5 font-mono text-[length:var(--text-2xs)] text-[color:var(--fg-3)]">
               {node.meta?.passageCount}
             </span>
           )}
@@ -184,7 +184,7 @@ function SourcesTree({ message }: { message: Message }) {
             <span key={i} className="flex items-center gap-1">
               {i > 0 && <span className="text-[color:var(--fg-3)]">›</span>}
               <span
-                className={`font-mono text-[10px] ${
+                className={`font-mono text-[length:var(--text-xs)] ${
                   i === selectedPath.length - 1 ? "text-[color:var(--node-provenance)]" : "text-[color:var(--fg-2)]"
                 }`}
               >
@@ -193,7 +193,7 @@ function SourcesTree({ message }: { message: Message }) {
             </span>
           ))
         ) : (
-          <span className="font-mono text-[10px] text-[color:var(--fg-3)]">
+          <span className="font-mono text-[length:var(--text-xs)] text-[color:var(--fg-3)]">
             Click a document to trace it to its source root
           </span>
         )}
@@ -231,7 +231,7 @@ function RelationsTree({ message }: { message: Message }) {
     });
 
   if (groups.length === 0) {
-    return <p className="px-1 py-2 text-[11px] text-[color:var(--fg-3)]">No relations traversed.</p>;
+    return <p className="px-1 py-2 text-[length:var(--text-sm)] text-[color:var(--fg-3)]">No relations traversed.</p>;
   }
 
   return (
@@ -250,10 +250,10 @@ function RelationsTree({ message }: { message: Message }) {
                 <Chevron open={isOpen} />
               </span>
               <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color, boxShadow: `0 0 6px ${color}66` }} />
-              <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-[color:var(--fg)]">
+              <span className="min-w-0 flex-1 truncate text-[length:var(--text-sm)] font-medium text-[color:var(--fg)]">
                 {g.name}
               </span>
-              <span className="shrink-0 rounded-full bg-[color:var(--bg-3)] px-1.5 py-0.5 font-mono text-[8.5px] text-[color:var(--fg-3)]">
+              <span className="shrink-0 rounded-full bg-[color:var(--bg-3)] px-1.5 py-0.5 font-mono text-[length:var(--text-2xs)] text-[color:var(--fg-3)]">
                 {g.rels.length}
               </span>
             </button>
@@ -263,8 +263,8 @@ function RelationsTree({ message }: { message: Message }) {
                   const to = splitId(r.to);
                   const toColor = COLOR[to.label] ?? "#94A3B8";
                   return (
-                    <div key={i} className="flex items-center gap-2 text-[11px]">
-                      <span className="shrink-0 rounded border border-[color:var(--line)] bg-[color:var(--bg-2)] px-1.5 py-0.5 font-mono text-[8.5px] uppercase tracking-wider text-[color:var(--fg-3)]">
+                    <div key={i} className="flex items-center gap-2 text-[length:var(--text-sm)]">
+                      <span className="shrink-0 rounded border border-[color:var(--line)] bg-[color:var(--bg-2)] px-1.5 py-0.5 font-mono text-[length:var(--text-2xs)] uppercase tracking-wider text-[color:var(--fg-3)]">
                         {r.rel}
                       </span>
                       <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: toColor }} />
@@ -313,11 +313,11 @@ export function SourcesPanel({
       >
         <header className="flex items-center justify-between border-b border-[color:var(--line)] px-4 py-3">
           <div className="min-w-0">
-            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[color:var(--fg-3)]">
+            <div className="font-mono text-[length:var(--text-xs)] uppercase tracking-[0.18em] text-[color:var(--fg-3)]">
               Sources &amp; Relations
             </div>
             {preview && (
-              <div className="mt-0.5 truncate text-[11px] text-[color:var(--fg-2)]">{preview}…</div>
+              <div className="mt-0.5 truncate text-[length:var(--text-sm)] text-[color:var(--fg-2)]">{preview}…</div>
             )}
           </div>
           <button
@@ -339,7 +339,7 @@ export function SourcesPanel({
               key={t}
               type="button"
               onClick={() => setTab(t)}
-              className={`rounded-lg px-3 py-1.5 text-[11px] font-medium capitalize transition-colors cursor-pointer ${
+              className={`rounded-lg px-3 py-1.5 text-[length:var(--text-sm)] font-medium capitalize transition-colors cursor-pointer ${
                 tab === t
                   ? "bg-[color:var(--bg-3)] text-[color:var(--fg)]"
                   : "text-[color:var(--fg-3)] hover:text-[color:var(--fg-2)]"
@@ -352,7 +352,7 @@ export function SourcesPanel({
 
         <div className="flex-1 overflow-y-auto px-3 py-3">
           {!message ? (
-            <p className="px-1 py-2 text-[11px] text-[color:var(--fg-3)]">
+            <p className="px-1 py-2 text-[length:var(--text-sm)] text-[color:var(--fg-3)]">
               Ask a question — its sources and the relations it traversed will appear here.
             </p>
           ) : tab === "sources" ? (

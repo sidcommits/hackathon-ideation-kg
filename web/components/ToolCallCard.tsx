@@ -38,7 +38,7 @@ export function ToolCallCard({ card }: { card: ToolCard }) {
           )}
         </span>
 
-        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[color:var(--fg-3)]">
+        <span className="font-mono text-[length:var(--text-xs)] uppercase tracking-[0.14em] text-[color:var(--fg-3)]">
           {running ? "Calling" : "Tool"}
         </span>
 
@@ -47,14 +47,14 @@ export function ToolCallCard({ card }: { card: ToolCard }) {
         </span>
 
         {args.length > 0 && (
-          <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[color:var(--fg-3)]">
+          <span className="min-w-0 flex-1 truncate font-mono text-[length:var(--text-sm)] text-[color:var(--fg-3)]">
             ({args.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(", ")})
           </span>
         )}
       </div>
 
       {card.summary && (
-        <div className="border-t border-[color:var(--line)] bg-[color:var(--bg-2)]/40 px-3 py-1.5 pl-9 font-mono text-[11px] text-[color:var(--fg-2)]">
+        <div className="border-t border-[color:var(--line)] bg-[color:var(--bg-2)]/40 px-3 py-1.5 pl-9 font-mono text-[length:var(--text-sm)] text-[color:var(--fg-2)]">
           {card.summary}
         </div>
       )}

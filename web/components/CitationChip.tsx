@@ -47,7 +47,7 @@ export function CitationChip({ c }: { c: Citation }) {
         <path d="M14 3v4h4" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
       </svg>
 
-      <span className="truncate font-mono text-[11px] text-[color:var(--fg-2)] group-hover:text-[color:var(--fg)]">
+      <span className="truncate font-mono text-[length:var(--text-sm)] text-[color:var(--fg-2)] group-hover:text-[color:var(--fg)]">
         {c.doc_title}
       </span>
 
@@ -55,7 +55,7 @@ export function CitationChip({ c }: { c: Citation }) {
 
       <span className={`flex shrink-0 items-center gap-1 ${s.text}`}>
         <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
-        <span className="font-mono text-[9.5px] font-medium uppercase tracking-[0.1em]">
+        <span className="font-mono text-[length:var(--text-2xs)] font-medium uppercase tracking-[0.1em]">
           {c.sensitivity}
         </span>
       </span>

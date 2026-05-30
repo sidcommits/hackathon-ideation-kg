@@ -62,7 +62,7 @@ export default function Home() {
                   Company Brain
                 </span>
               </div>
-              <div className="text-[10.5px] uppercase tracking-[0.18em] text-[color:var(--fg-3)]">
+              <div className="text-[length:var(--text-xs)] uppercase tracking-[0.18em] text-[color:var(--fg-3)]">
                 Regulatory Knowledge · Traced &amp; Governed
               </div>
             </div>
@@ -88,12 +88,12 @@ export default function Home() {
                 <h3 className="text-xs font-bold uppercase tracking-wider text-[color:var(--fg)] mb-2.5">
                   Advisor Integration Setup
                 </h3>
-                <p className="text-[11px] leading-normal text-[color:var(--fg-3)] mb-4">
+                <p className="text-[length:var(--text-sm)] leading-normal text-[color:var(--fg-3)] mb-4">
                   To connect the Beyond Presence digital avatar, provide your localtunnel or ngrok public URL.
                 </p>
                 <div className="flex flex-col gap-2.5">
                   <div>
-                    <label htmlFor="tunnel-url-input" className="block text-[9.5px] uppercase tracking-wider font-semibold text-[color:var(--fg-3)] mb-1">
+                    <label htmlFor="tunnel-url-input" className="block text-[length:var(--text-2xs)] uppercase tracking-wider font-semibold text-[color:var(--fg-3)] mb-1">
                       Public Tunnel URL
                     </label>
                     <input
@@ -181,7 +181,7 @@ export default function Home() {
                   <SendArrow />
                 </button>
               </div>
-              <p className="mt-2 px-1 text-center text-[10.5px] text-[color:var(--fg-3)]">
+              <p className="mt-2 px-1 text-center text-[length:var(--text-xs)] text-[color:var(--fg-3)]">
                 Answers cite their source document, passage, and sensitivity label.
               </p>
             </div>
@@ -202,7 +202,7 @@ export default function Home() {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M9 6l6 6-6 6" />
             </svg>
-            <span className="font-mono text-[9px] uppercase tracking-[0.18em] [writing-mode:vertical-rl]">
+            <span className="font-mono text-[length:var(--text-2xs)] uppercase tracking-[0.18em] [writing-mode:vertical-rl]">
               Sources
             </span>
           </button>
@@ -253,7 +253,7 @@ function StatusPill({ busy }: { busy: boolean }) {
             : "bg-[color:var(--node-backbone)]"
         }`}
       />
-      <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-[color:var(--fg-3)]">
+      <span className="font-mono text-[length:var(--text-xs)] uppercase tracking-[0.15em] text-[color:var(--fg-3)]">
         {busy ? "Reasoning" : "Ready"}
       </span>
     </div>
@@ -359,7 +359,7 @@ function EmptyState({ onPick, busy, startCall, isAgentRegistered, registerAgent 
             </svg>
             Talk to Video Advisor
           </button>
-          <div className="mt-2.5 flex items-center gap-1.5 text-[10px] text-emerald-400 bg-emerald-500/5 border border-emerald-500/10 rounded-full px-2.5 py-0.5">
+          <div className="mt-2.5 flex items-center gap-1.5 text-[length:var(--text-xs)] text-emerald-400 bg-emerald-500/5 border border-emerald-500/10 rounded-full px-2.5 py-0.5">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
             <span>Digital Human Advisor Ready</span>
           </div>
@@ -375,7 +375,7 @@ function EmptyState({ onPick, busy, startCall, isAgentRegistered, registerAgent 
               Advisor Connection Required
             </h3>
           </div>
-          <p className="text-[11px] leading-normal text-[color:var(--fg-3)] mb-3.5">
+          <p className="text-[length:var(--text-sm)] leading-normal text-[color:var(--fg-3)] mb-3.5">
             Beyond Presence needs a public tunnel to hit your local brain. Copy your URL from the <code>npx localtunnel --port 8000</code> terminal window:
           </p>
           <div className="flex gap-2">

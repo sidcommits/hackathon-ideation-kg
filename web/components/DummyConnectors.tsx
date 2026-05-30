@@ -66,10 +66,10 @@ export function DummyConnectors() {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-2 pl-1">
-        <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-[color:var(--fg-3)]">
+        <span className="font-mono text-[length:var(--text-2xs)] uppercase tracking-[0.16em] text-[color:var(--fg-3)]">
           Connected Sources
         </span>
-        <span className="rounded-full border border-[color:var(--line)] bg-[color:var(--bg-2)]/70 px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-[0.12em] text-[color:var(--fg-3)]">
+        <span className="rounded-full border border-[color:var(--line)] bg-[color:var(--bg-2)]/70 px-1.5 py-0.5 font-mono text-[length:var(--text-2xs)] uppercase tracking-[0.12em] text-[color:var(--fg-3)]">
           Preview
         </span>
       </div>
@@ -84,7 +84,7 @@ export function DummyConnectors() {
               <c.Logo />
             </span>
 
-            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-[color:var(--fg-3)]">
+            <span className="font-mono text-[length:var(--text-xs)] uppercase tracking-[0.14em] text-[color:var(--fg-3)]">
               Tool
             </span>
 
@@ -92,12 +92,12 @@ export function DummyConnectors() {
               {c.name}
             </span>
 
-            <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[color:var(--fg-3)]">
+            <span className="min-w-0 flex-1 truncate font-mono text-[length:var(--text-sm)] text-[color:var(--fg-3)]">
               ({c.query})
             </span>
           </div>
 
-          <div className="border-t border-[color:var(--line)] bg-[color:var(--bg-2)]/40 px-3 py-1.5 pl-9 font-mono text-[11px] text-[color:var(--fg-2)]">
+          <div className="border-t border-[color:var(--line)] bg-[color:var(--bg-2)]/40 px-3 py-1.5 pl-9 font-mono text-[length:var(--text-sm)] text-[color:var(--fg-2)]">
             {c.summary}
           </div>
         </div>
