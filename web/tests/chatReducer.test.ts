@@ -121,6 +121,35 @@ describe("chatReducer", () => {
     expect(assistant.text).toBe("SFDR is a disclosure regulation.");
   });
 
+  it("appends a complete user+assistant pair atomically on mirror_turn", () => {
+    const s = feed([
+      {
+        type: "mirror_turn",
+        question: "Is an ESG note reportable?",
+        answer: "Yes — it is MiFIR-reportable and complex.",
+        citations: [{ doc_title: "ESMA", sensitivity: "C2 Internal", chunk_text: "x" }],
+        graph_delta: { nodes: [{ id: "Reg:MiFIR", label: "Regulation" }], edges: [] },
+      },
+    ]);
+    expect(s.messages).toHaveLength(2);
+    expect(s.messages[0]).toMatchObject({ role: "user", text: "Is an ESG note reportable?" });
+    const a = s.messages[1];
+    expect(a.role).toBe("assistant");
+    expect(a.text).toBe("Yes — it is MiFIR-reportable and complex.");
+    expect(a.citations).toHaveLength(1);
+    expect(s.graph.nodes.map((n) => n.id)).toContain("Reg:MiFIR");
+  });
+
+  it("keeps two mirror_turns as separate, non-scrambled bubbles", () => {
+    const s = feed([
+      { type: "mirror_turn", question: "Q1", answer: "A1", citations: [],
+        graph_delta: { nodes: [], edges: [] } },
+      { type: "mirror_turn", question: "Q2", answer: "A2", citations: [],
+        graph_delta: { nodes: [], edges: [] } },
+    ]);
+    expect(s.messages.map((m) => m.text)).toEqual(["Q1", "A1", "Q2", "A2"]);
+  });
+
   it("renders an error event into the assistant message", () => {
     const s = feed([
       { type: "message_start", id: "m1" },

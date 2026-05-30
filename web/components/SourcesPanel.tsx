@@ -248,7 +248,7 @@ function SourcesTree({
           onMouseEnter={() => setHoveredKey(key)}
           style={{ paddingLeft: pad + 8 }}
           className={`flex items-center gap-1.5 rounded-lg pr-1.5 transition-colors hover:bg-[color:var(--bg-3)]/40 ${
-            isSelected ? "bg-[color:var(--bg-3)]/60" : ""
+            isSelected ? "trace-bound" : ""
           } ${pulseKey === key ? "source-focus-pulse" : ""}`}
         >
           <button
@@ -374,12 +374,13 @@ export function DockedSourcesPanel({
   const preview = message?.text?.replace(/[#*`>]/g, "").trim().slice(0, 90);
   return (
     <div className="flex h-full flex-col bg-[color:var(--bg-2)]">
-      <header className="border-b border-[color:var(--line)] bg-[color:var(--bg-3)]/40 px-4 py-[14px]">
-        <div className="font-mono text-[length:var(--text-xs)] uppercase tracking-[0.18em] text-[color:var(--fg-2)]">
-          Sources
+      <header className="border-b border-[color:var(--line)] px-4 py-[14px]">
+        <div className="flex items-center gap-2.5">
+          <span className="kicker text-[color:var(--brass)]">Provenance</span>
+          <span className="rule-brass-in h-px flex-1 bg-[color:var(--brass-dim)]/40" aria-hidden />
         </div>
-        <div className="mt-0.5 truncate text-[length:var(--text-sm)] text-[color:var(--fg-2)]">
-          {preview ? `${preview}…` : "Traceable provenance for every answer"}
+        <div className="mt-1 truncate text-[length:var(--text-sm)] text-[color:var(--fg-3)]">
+          {preview ? `${preview}…` : "Every claim, traced to the passage it rests on."}
         </div>
       </header>
       <SourcesBody message={message} focusDoc={focusDoc} focusNonce={focusNonce} />
@@ -423,9 +424,7 @@ export function SourcesPanel({
       >
         <header className="flex items-center justify-between border-b border-[color:var(--line)] px-4 py-3">
           <div className="min-w-0">
-            <div className="font-mono text-[length:var(--text-xs)] uppercase tracking-[0.18em] text-[color:var(--fg-3)]">
-              Sources
-            </div>
+            <span className="kicker text-[color:var(--brass)]">Provenance</span>
             {preview && (
               <div className="mt-0.5 truncate text-[length:var(--text-sm)] text-[color:var(--fg-2)]">{preview}…</div>
             )}

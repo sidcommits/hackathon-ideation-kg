@@ -2,93 +2,111 @@
 @plugin "@tailwindcss/typography";
 
 /* ============================================================
-   SIX · Company Brain — institutional-grade visual identity
-   Dark, near-black canvas. Bloomberg / Linear / Mercury tone.
-   Semantic node palette ties graph legend ↔ UI.
+   SIX · Company Brain — "The Reading Room of a Swiss institution"
+   Warm-ink canvas, a brass provenance accent, sharp-serif type.
+   Red = the brand mark + the single state-alarm.
+   Brass = the trust/provenance system (always a line/numeral/rule).
+   Sensitivity = governance state (always a labelled mono chip).
    ============================================================ */
 
 :root {
-  /* Charcoal canvas (lifted from near-black for a softer, less murky dark mode) */
-  --bg:        #111317;
-  --bg-2:      #171A20;   /* raised surface */
-  --bg-3:      #1E222A;   /* card / input */
-  --line:      #272C34;   /* hairline borders */
-  --line-2:    #343A44;   /* stronger borders / hover */
+  /* Warm-ink canvas — aged paper photographed in low light (not blue-charcoal) */
+  --bg:        #13110F;   /* warm near-black ink */
+  --bg-2:      #1A1714;   /* the Ledger / raised surface ("vellum in shadow") */
+  --bg-3:      #211D19;   /* desk / card / input */
+  --line:      #2C2722;   /* warm hairline borders */
+  --line-2:    #3A332C;   /* stronger borders / hover */
 
-  /* Type */
-  --fg:        #E7EAEE;   /* primary text */
-  --fg-2:      #9BA3AE;   /* secondary */
-  --fg-3:      #79818D;   /* muted / captions (brightened for larger captions) */
+  /* Type — bone, not clinical */
+  --fg:        #EDE7DC;   /* primary */
+  --fg-2:      #A89F92;   /* secondary */
+  --fg-3:      #7C7468;   /* muted / captions */
 
-  /* Single accent — SIX brand red */
-  --accent:        #EC0016;
-  --accent-dim:    #B0000F;
-  --accent-glow:   rgba(236, 0, 22, 0.16);
+  /* SIX red — the brand mark + the one state-alarm. Used as an editorial
+     stroke (rule, marginalia, alarm), never sprayed as ambient glow. */
+  --accent:        #E2231A;
+  --accent-dim:    #A8160F;
+  --accent-glow:   rgba(226, 35, 26, 0.16);
 
-  /* Semantic node palette (graph ↔ legend ↔ UI) */
-  --node-backbone:  #34D399; /* green  — Regulation / DataAttribute / InstrumentType */
-  --node-reasoning: #60A5FA; /* blue   — Obligation / Concept / Insight */
-  --node-provenance:#C084FC; /* purple — Document / Chunk */
+  /* Brass / gilt — the trust & provenance system. Always a line, numeral,
+     rule, or focus edge — NEVER a filled chip (that lane belongs to sensitivity). */
+  --brass:         #B8975A;
+  --brass-dim:     #8E7440;
+  --brass-glow:    rgba(184, 151, 90, 0.16);
 
-  /* Sensitivity */
-  --sev-internal:  #E0A93B; /* amber */
-  --sev-conf:      #F1607E; /* rose  */
+  /* Sensitivity — governance STATE. Always a labelled mono chip.
+     Internal nudged cooler-gold to stay clear of brass. */
+  --sev-internal:  #CBA13C; /* amber  — C2 Internal */
+  --sev-conf:      #D46A6A; /* rose   — Confidential */
+
+  /* Legacy semantic node palette — retained for the (unrendered) graph viz
+     and the brand glyph; purged from general chrome. */
+  --node-backbone:  #B8975A;
+  --node-reasoning: #B8975A;
+  --node-provenance:#B8975A;
 
   /* Theme-dependent atmospherics (overridden in light mode) */
-  --grid-line:     rgba(255, 255, 255, 0.018);
-  --glass-top:     rgba(255, 255, 255, 0.025);
-  --glass-inset:   rgba(255, 255, 255, 0.03);
-  --glass-shadow:  rgba(0, 0, 0, 0.6);
-  --code-bg:       rgba(255, 255, 255, 0.06);
+  --grid-line:     rgba(237, 231, 220, 0.02);
+  --glass-top:     rgba(237, 231, 220, 0.022);
+  --glass-inset:   rgba(237, 231, 220, 0.03);
+  --glass-shadow:  rgba(0, 0, 0, 0.55);
+  --code-bg:       rgba(237, 231, 220, 0.06);
 
-  /* Type scale (Comfortable, ~+18% over prior floor) — used app-wide */
+  /* Type scale */
   --text-2xs: 11px;   /* pills, count badges, tiny mono labels */
   --text-xs:  12px;   /* eyebrows, "Tool" label, legend */
   --text-sm:  13.5px; /* tool name, chips, tree rows, captions */
   --text-base:15px;   /* secondary body */
   --text-md:  17px;   /* answer body + question bubbles */
   --text-lg:  20px;   /* section headings in answers */
+  --text-display: clamp(40px, 6vw, 70px); /* hero / verdict cover */
+
+  --track-eyebrow: 0.22em;
 }
 
 /* ============================================================
-   LIGHT MODE — clean institutional daylight (Linear / Stripe tone)
-   Cool off-white canvas, ink-slate text, SIX red accent.
+   LIGHT MODE — "reading-room daylight" (the demo hero frame)
+   Warm ecru paper, ink text, brass + red accents. Stripe-Press tone.
    ============================================================ */
 :root[data-theme="light"] {
-  --bg:        #F7F8FA;
-  --bg-2:      #FFFFFF;
-  --bg-3:      #FFFFFF;
-  --line:      #E5E8EC;
-  --line-2:    #D2D7DE;
+  --bg:        #F4F1EA;   /* warm ecru paper */
+  --bg-2:      #FBFAF6;   /* the Ledger surface — a hair brighter */
+  --bg-3:      #FFFFFF;   /* desk / card / input */
+  --line:      #E4DECF;
+  --line-2:    #D2C9B4;
 
-  --fg:        #0E1117;
-  --fg-2:      #475063;
-  --fg-3:      #6B7480;
+  --fg:        #1A1714;   /* warm ink */
+  --fg-2:      #5A5346;
+  --fg-3:      #837A6A;
 
-  --accent:        #D10014;
-  --accent-dim:    #A8000F;
-  --accent-glow:   rgba(209, 0, 20, 0.16);
+  --accent:        #C81912;
+  --accent-dim:    #A8160F;
+  --accent-glow:   rgba(200, 25, 18, 0.14);
 
-  --node-backbone:  #0F9D63;
-  --node-reasoning: #2563EB;
-  --node-provenance:#9333EA;
+  --brass:         #9B7B3A;  /* deeper brass reads on paper */
+  --brass-dim:     #7C6230;
+  --brass-glow:    rgba(155, 123, 58, 0.16);
 
-  --sev-internal:  #B7791F;
-  --sev-conf:      #DB2777;
+  --sev-internal:  #9A7615;
+  --sev-conf:      #C0392B;
 
-  --grid-line:     rgba(15, 23, 42, 0.04);
-  --glass-top:     rgba(15, 23, 42, 0.015);
-  --glass-inset:   rgba(255, 255, 255, 0.8);
-  --glass-shadow:  rgba(15, 23, 42, 0.10);
-  --code-bg:       rgba(15, 23, 42, 0.05);
+  --node-backbone:  #9B7B3A;
+  --node-reasoning: #9B7B3A;
+  --node-provenance:#9B7B3A;
+
+  --grid-line:     rgba(26, 23, 20, 0.035);
+  --glass-top:     rgba(26, 23, 20, 0.012);
+  --glass-inset:   rgba(255, 255, 255, 0.85);
+  --glass-shadow:  rgba(26, 23, 20, 0.10);
+  --code-bg:       rgba(26, 23, 20, 0.05);
 }
 
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--fg);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-jetbrains-mono);
-  --font-display: var(--font-newsreader);
+  --font-sans: var(--font-inter-tight);
+  --font-mono: var(--font-plex-mono);
+  --font-display: var(--font-fraunces);
 }
 
 html,
@@ -99,8 +117,8 @@ body {
 body {
   background: var(--bg);
   color: var(--fg);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  font-feature-settings: "ss01", "cv01", "cv11";
+  font-family: var(--font-inter-tight), ui-sans-serif, system-ui, sans-serif;
+  font-feature-settings: "ss01", "cv01";
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -113,31 +131,41 @@ body,
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
-/* ---- Atmospheric backdrop: a faint top-lit aurora + grid grain ---- */
+/* ---- Atmosphere: ONE soft brass desk-light from above-left + base vignette.
+   (Replaces the generic red aurora.) Reading surfaces stay flat — atmosphere
+   lives behind the canvas only. ---- */
 .brain-canvas {
   position: relative;
   isolation: isolate;
   background:
-    radial-gradient(130% 82% at 50% -25%, rgba(236, 0, 22, 0.10), transparent 58%),
-    radial-gradient(80% 52% at 100% -5%, rgba(96, 165, 250, 0.045), transparent 55%),
+    radial-gradient(120% 78% at 28% -12%, rgba(184, 151, 90, 0.07), transparent 58%),
     radial-gradient(125% 95% at 50% 122%, rgba(0, 0, 0, 0.42), transparent 55%),
     var(--bg);
 }
-/* Fine film grain — a refined print texture for depth (kept very subtle). */
+:root[data-theme="light"] .brain-canvas {
+  background:
+    radial-gradient(120% 78% at 28% -12%, rgba(155, 123, 58, 0.10), transparent 58%),
+    radial-gradient(125% 95% at 50% 124%, rgba(26, 23, 20, 0.05), transparent 55%),
+    var(--bg);
+}
+
+/* Low-frequency warm PAPER FIBER (not high-freq TV static). Soft-light keeps it
+   as texture, not noise. */
 .brain-canvas::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: -1;
   pointer-events: none;
-  opacity: 0.04;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.05;
+  mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.012 0.5' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)'/%3E%3C/svg%3E");
 }
 :root[data-theme="light"] .brain-canvas::after {
-  opacity: 0.025;
+  opacity: 0.04;
   mix-blend-mode: multiply;
 }
+/* Faint baseline grid, masked toward the top light. */
 .brain-canvas::before {
   content: "";
   position: absolute;
@@ -146,8 +174,8 @@ body,
   background-image:
     linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
     linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
-  background-size: 44px 44px;
-  mask-image: radial-gradient(120% 100% at 50% 0%, #000 30%, transparent 90%);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(120% 100% at 30% 0%, #000 28%, transparent 88%);
 }
 
 /* ---- Scrollbars: thin, ghostly, on-brand ---- */
@@ -168,137 +196,165 @@ body,
   border: 2px solid transparent;
   background-clip: content-box;
 }
-*::-webkit-scrollbar-thumb:hover {
-  background: #333a44;
-  background-clip: content-box;
-}
 
-/* ---- Streaming caret (token streaming) ---- */
+/* ---- Streaming caret ---- */
 .stream-caret {
   display: inline-block;
   width: 0.5ch;
   height: 1em;
   margin-left: 1px;
   vertical-align: text-bottom;
-  background: var(--accent);
+  background: var(--brass);
   border-radius: 1px;
-  box-shadow: 0 0 8px var(--accent-glow);
   animation: caret-blink 1.05s steps(2, jump-none) infinite;
 }
 @keyframes caret-blink {
-  0%,
-  45% {
-    opacity: 1;
-  }
-  46%,
-  100% {
-    opacity: 0;
-  }
+  0%, 45% { opacity: 1; }
+  46%, 100% { opacity: 0; }
 }
 
-/* ---- Tool card: running → done resolve ---- */
+/* ---- Tool / reasoning entrance ---- */
 @keyframes tool-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-.tool-card {
-  animation: tool-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-.tool-pulse {
-  position: relative;
-}
-.tool-pulse::after {
-  content: "";
-  position: absolute;
-  inset: -3px;
-  border-radius: inherit;
-  box-shadow: 0 0 0 0 var(--accent-glow);
-  animation: tool-ring 1.6s ease-out infinite;
-}
-@keyframes tool-ring {
-  0% {
-    box-shadow: 0 0 0 0 rgba(236, 0, 22, 0.35);
-  }
-  70%,
-  100% {
-    box-shadow: 0 0 0 7px rgba(236, 0, 22, 0);
-  }
-}
+.tool-card { animation: tool-in 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
 /* ---- Message entrance ---- */
 @keyframes msg-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-.msg-in {
-  animation: msg-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
+.msg-in { animation: msg-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
-/* ---- Empty-state hero shimmer ---- */
-@keyframes hero-rise {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.hero-rise {
-  animation: hero-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
+/* ============================================================
+   EDITORIAL TYPE UTILITIES
+   ============================================================ */
 
-/* Staggered entrance for hero children — one orchestrated reveal on load. */
-.hero-stagger > * {
-  animation: hero-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-.hero-stagger > *:nth-child(1) { animation-delay: 0.05s; }
-.hero-stagger > *:nth-child(2) { animation-delay: 0.16s; }
-.hero-stagger > *:nth-child(3) { animation-delay: 0.27s; }
-.hero-stagger > *:nth-child(4) { animation-delay: 0.38s; }
-.hero-stagger > *:nth-child(5) { animation-delay: 0.49s; }
-.hero-stagger > *:nth-child(6) { animation-delay: 0.60s; }
-
-/* Editorial display serif — for the hero headline & section gravitas. */
+/* Display serif — verdicts, the hero headline, answer headings. */
 .display {
   font-family: var(--font-display), Georgia, "Times New Roman", serif;
   font-weight: 400;
-  letter-spacing: -0.015em;
-  line-height: 1.05;
+  letter-spacing: -0.02em;
+  line-height: 1.04;
   font-feature-settings: "liga", "dlig";
 }
-.display em {
-  font-style: italic;
-  font-weight: 400;
+.display em { font-style: italic; font-weight: 400; }
+
+/* All-caps mono eyebrow / kicker. */
+.kicker {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--track-eyebrow);
+  color: var(--fg-3);
 }
 
-/* A precise SIX-red rule — an editorial mark that draws itself in. */
+/* Table-of-contents index numeral (brass). */
+.index-num {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  color: var(--brass);
+}
+
+/* The verdict line of an answer (the document's headline). */
+.verdict {
+  font-family: var(--font-display), Georgia, serif;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1.12;
+}
+
+/* ============================================================
+   PROVENANCE / TRUST MARKS  (brass = always a line/numeral/rule)
+   ============================================================ */
+
+/* The hero's editorial red rule — draws itself in. */
 .rule-red {
   height: 2px;
   width: 0;
   border-radius: 2px;
   background: var(--accent);
-  box-shadow: 0 0 10px var(--accent-glow);
   animation: rule-grow 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.5s forwards;
 }
-@keyframes rule-grow {
-  to { width: 52px; }
+@keyframes rule-grow { to { width: 56px; } }
+
+/* The Ledger's provenance hairlines — rule themselves in left→right on load. */
+.rule-brass-in {
+  transform-origin: left center;
+  animation: rule-brass-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.55s both;
+}
+@keyframes rule-brass-in { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* Inline citation marker — a brass superscript numeral, the trace trigger. */
+.citation-marker {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.72em;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--brass);
+  border-bottom: 1px solid var(--brass-dim);
+  padding: 0 1px;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.citation-marker:hover,
+.citation-marker[data-active="true"] {
+  color: var(--bg);
+  background: var(--brass);
+  border-radius: 3px;
+  border-bottom-color: transparent;
 }
 
-/* ---- Glass elevation utility ---- */
+/* The BINDING: a brass left-edge rule. Worn by the lit claim (answer side) AND
+   the lit passage (ledger side) — same colour, same weight, one on each side of
+   the gutter. The eye connects them; we don't draw the line. */
+.trace-bound {
+  box-shadow: inset 2px 0 0 0 var(--brass);
+  background: color-mix(in srgb, var(--brass) 8%, transparent);
+}
+
+/* The one motion pass that confirms a freshly-clicked trace. */
+@keyframes trace-flash {
+  0%   { box-shadow: inset 2px 0 0 0 var(--brass), 0 0 0 0 var(--brass-glow); background: color-mix(in srgb, var(--brass) 20%, transparent); }
+  60%  { box-shadow: inset 2px 0 0 0 var(--brass), 0 0 0 4px var(--brass-glow); background: color-mix(in srgb, var(--brass) 11%, transparent); }
+  100% { box-shadow: inset 2px 0 0 0 var(--brass), 0 0 0 0 transparent; background: color-mix(in srgb, var(--brass) 8%, transparent); }
+}
+.source-focus-pulse { animation: trace-flash 1.2s ease-out; }
+
+/* Pencil-highlight on a cited sentence inside a passage (warm graphite wash). */
+.pencil-mark {
+  background: color-mix(in srgb, var(--brass) 16%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brass) 16%, transparent);
+  border-radius: 2px;
+}
+
+/* ============================================================
+   HERO ORCHESTRATION (one beat on load, reduced-motion exempt)
+   ============================================================ */
+@keyframes hero-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.hero-rise { animation: hero-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Headline prints upward behind a mask. */
+@keyframes headline-print {
+  from { opacity: 0; clip-path: inset(0 0 100% 0); transform: translateY(8px); }
+  to   { opacity: 1; clip-path: inset(0 0 0 0);    transform: translateY(0); }
+}
+.headline-print { animation: headline-print 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.18s both; }
+
+.hero-stagger > * { animation: hero-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hero-stagger > *:nth-child(1) { animation-delay: 0.04s; }
+.hero-stagger > *:nth-child(2) { animation-delay: 0.30s; }
+.hero-stagger > *:nth-child(3) { animation-delay: 0.42s; }
+.hero-stagger > *:nth-child(4) { animation-delay: 0.54s; }
+.hero-stagger > *:nth-child(5) { animation-delay: 0.66s; }
+.hero-stagger > *:nth-child(6) { animation-delay: 0.78s; }
+
+/* ---- Glass — reserved for the input "desk" + mobile slide-over only ---- */
 .glass {
   background:
     linear-gradient(180deg, var(--glass-top), transparent 42%),
@@ -308,58 +364,58 @@ body,
     0 1px 0 0 var(--glass-inset) inset,
     0 1px 2px -1px var(--glass-shadow),
     0 14px 36px -18px var(--glass-shadow);
-  backdrop-filter: blur(10px) saturate(120%);
+  backdrop-filter: blur(10px) saturate(118%);
 }
 
-/* ---- Focus ring on input ---- */
+/* ---- Focus ring on input — brass (interaction lane) ---- */
 .input-focus:focus-within {
-  border-color: var(--accent-dim);
+  border-color: var(--brass-dim);
   box-shadow:
-    0 0 0 1px var(--accent-dim),
-    0 0 0 4px var(--accent-glow);
+    0 0 0 1px var(--brass-dim),
+    0 0 0 4px var(--brass-glow);
 }
 
-/* ---- Markdown / prose tuning inside bubbles ----
-   Bind Tailwind Typography's color tokens to our theme vars. We set BOTH the
-   normal and the `-invert-` variants so the hardcoded `prose-invert` class on
-   the bubble can't override them — text stays readable in light AND dark mode.
-   (Light-mode bug: prose-invert made body paragraphs light-grey on white.) */
+/* ============================================================
+   MARKDOWN / PROSE — the typeset answer document
+   ============================================================ */
 .prose {
-  --tw-prose-body: var(--fg-2);
+  --tw-prose-body: var(--fg);
   --tw-prose-headings: var(--fg);
   --tw-prose-bold: var(--fg);
   --tw-prose-counters: var(--fg-3);
   --tw-prose-bullets: var(--line-2);
   --tw-prose-hr: var(--line);
   --tw-prose-quotes: var(--fg-2);
-  --tw-prose-quote-borders: var(--line-2);
+  --tw-prose-quote-borders: var(--brass-dim);
   --tw-prose-links: var(--accent);
   --tw-prose-code: var(--fg);
   --tw-prose-pre-bg: var(--bg-2);
   --tw-prose-th-borders: var(--line-2);
   --tw-prose-td-borders: var(--line);
 
-  --tw-prose-invert-body: var(--fg-2);
+  --tw-prose-invert-body: var(--fg);
   --tw-prose-invert-headings: var(--fg);
   --tw-prose-invert-bold: var(--fg);
   --tw-prose-invert-counters: var(--fg-3);
   --tw-prose-invert-bullets: var(--line-2);
   --tw-prose-invert-hr: var(--line);
   --tw-prose-invert-quotes: var(--fg-2);
-  --tw-prose-invert-quote-borders: var(--line-2);
+  --tw-prose-invert-quote-borders: var(--brass-dim);
   --tw-prose-invert-links: var(--accent);
   --tw-prose-invert-code: var(--fg);
   --tw-prose-invert-pre-bg: var(--bg-2);
   --tw-prose-invert-th-borders: var(--line-2);
   --tw-prose-invert-td-borders: var(--line);
+
+  line-height: 1.7;            /* give regulatory prose air — it's a reading room */
 }
 
 .prose :where(code):not(:where(pre code)) {
-  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+  font-family: var(--font-mono), ui-monospace, monospace;
   background: var(--code-bg);
   padding: 0.1em 0.36em;
   border-radius: 5px;
-  font-size: 0.86em;
+  font-size: 0.84em;
   font-weight: 500;
 }
 .prose :where(a) {
@@ -367,37 +423,29 @@ body,
   text-decoration-color: var(--accent-dim);
   text-underline-offset: 3px;
 }
-.prose :where(strong) {
-  color: var(--fg);
-  font-weight: 650;
-}
+.prose :where(strong) { color: var(--fg); font-weight: 650; }
 
-/* Hard override: set readable colors directly on elements so neither the
-   `prose-invert` utility nor the `--tw-prose-*` tokens can wash them out in
-   light mode. Body text uses primary --fg for strong contrast on white. */
 .prose,
 .prose :where(p, li, ul, ol, blockquote, td, th, span):not(:where([class~="not-prose"] *)) {
   color: var(--fg);
 }
+/* Answer headings in the blade serif. */
 .prose :where(h1, h2, h3, h4, h5, h6) {
   color: var(--fg);
   font-family: var(--font-display), Georgia, serif;
   font-weight: 500;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.012em;
+}
+.prose :where(blockquote) {
+  font-style: normal;
+  border-left-width: 2px;
 }
 .prose :where(ol > li)::marker,
-.prose :where(ul > li)::marker {
-  color: var(--fg-3);
-}
-.prose :where(p):first-child {
-  margin-top: 0;
-}
-.prose :where(p):last-child {
-  margin-bottom: 0;
-}
+.prose :where(ul > li)::marker { color: var(--brass-dim); }
+.prose :where(p):first-child { margin-top: 0; }
+.prose :where(p):last-child { margin-bottom: 0; }
 
-/* GFM tables (parsed via remark-gfm): gridlines from our line tokens, a tinted
-   header, and horizontal scroll so a wide table never overflows the chat bubble. */
+/* GFM tables */
 .prose :where(table) {
   display: block;
   width: max-content;
@@ -407,45 +455,16 @@ body,
   margin: 0.9em 0;
   font-size: 0.92em;
 }
-.prose :where(thead) {
-  background: var(--bg-2);
-}
-.prose :where(th) {
-  font-weight: 650;
-  text-align: left;
-}
+.prose :where(thead) { background: var(--bg-2); }
+.prose :where(th) { font-weight: 650; text-align: left; }
 .prose :where(th, td) {
   border: 1px solid var(--line);
   padding: 0.4em 0.7em;
   vertical-align: top;
 }
 
-/* Citation-click focus: briefly ring + tint the targeted document row in the
-   Sources tree, so the eye lands on the file the user clicked in the chat. */
-@keyframes source-focus-pulse {
-  0% {
-    box-shadow: 0 0 0 0 var(--accent-glow);
-    background-color: color-mix(in srgb, var(--accent) 22%, transparent);
-  }
-  60% {
-    box-shadow: 0 0 0 3px var(--accent-glow);
-    background-color: color-mix(in srgb, var(--accent) 10%, transparent);
-  }
-  100% {
-    box-shadow: 0 0 0 0 transparent;
-    background-color: transparent;
-  }
-}
-.source-focus-pulse {
-  animation: source-focus-pulse 1.4s ease-out;
-  outline: 1px solid var(--accent-dim);
-  outline-offset: -1px;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *, *::before, *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
   }

@@ -13,7 +13,7 @@ import os
 from api.agent import make_client, run_agent
 import api.deps as deps
 from api.deps import get_embedder_cached, get_store
-from api.events import ErrorEvent, UserTranscript
+from api.events import ErrorEvent, MirrorTurn
 from api.prompt import SYSTEM_PROMPT
 from api.reflect_routes import router as reflect_router
 from api.tools import run_tool
@@ -419,22 +419,29 @@ async def chat_completions(req: BPCompletionsRequest):
     created = int(time.time())
     _ERR_TEXT = "Sorry, I hit a problem reaching the Company Brain. Please try again."
 
-    # Mirror the user's transcribed question into the web chat as a user bubble,
-    # before any assistant events, so the mirrored turn reads top-to-bottom.
-    if active_call and _last:
-        active_call.event_queue.put_nowait(UserTranscript(text=_last))
+    # Mirror this turn to the web chat as ONE atomic event, but suppress a
+    # CONCURRENT duplicate (Beyond Presence sometimes fires /v1 twice for the same
+    # turn). The check is synchronous (runs before any await) so two overlapping
+    # calls can't both pass it — yet a later re-ask of the same question still
+    # mirrors, because the question is removed from the in-flight set when done.
+    should_mirror = bool(active_call and _last and _last not in active_call.inflight_questions)
+    if should_mirror:
+        active_call.inflight_questions.add(_last)
 
     # The agent runs in a BACKGROUND task — decoupled from Beyond Presence's HTTP
-    # stream. BP only consumes the spoken summary (via `spoken_q`); the FULL web
-    # mirror (message_start → detail tokens → tool/citation events → message_end)
-    # is broadcast to the web SSE queue by the task itself. So even if BP hears the
-    # summary and drops/times-out its connection before [DONE], the detailed answer
-    # and its sources still finish streaming into the chat in real time.
+    # stream. BP only consumes the spoken summary (via `spoken_q`). The web chat
+    # gets ONE MirrorTurn (question + full detailed answer + citations) emitted at
+    # the END of the turn, so overlapping/duplicate turns can never interleave into
+    # a single scrambled bubble, and a BP disconnect can't truncate it.
     spoken_q: asyncio.Queue = asyncio.Queue()
     _DONE = object()
 
     async def _drive():
         """Drive one voice turn to completion regardless of BP's connection."""
+        answer_parts: list[str] = []
+        citations: list[dict] = []
+        nodes: dict[str, dict] = {}
+        edges: list[dict] = []
         try:
             client = make_client(settings.anthropic_api_key)
             agen = run_agent(
@@ -452,20 +459,33 @@ async def chat_completions(req: BPCompletionsRequest):
                 if event.type == "token":
                     ch = getattr(event, "channel", "full")
                     if ch in ("spoken", "both", "full"):
-                        spoken_q.put_nowait(event.text)        # → avatar
-                    if ch in ("detail", "both") and active_call:
-                        active_call.event_queue.put_nowait(event)  # → web chat
-                elif event.type in {
-                    "message_start", "tool_call", "tool_result",
-                    "citation", "message_end",
-                }:
-                    if active_call:
-                        active_call.event_queue.put_nowait(event)  # → web chat
+                        spoken_q.put_nowait(event.text)        # → avatar (real-time)
+                    if ch in ("detail", "both", "full"):
+                        answer_parts.append(event.text)        # → chat answer body
+                elif event.type == "citation":
+                    citations.append({"doc_title": event.doc_title,
+                                      "sensitivity": event.sensitivity,
+                                      "chunk_text": event.chunk_text})
+                elif event.type == "tool_result":
+                    gd = event.graph_delta
+                    gd = gd if isinstance(gd, dict) else gd.model_dump()
+                    for n in gd.get("nodes", []):
+                        nodes[n.get("id")] = n
+                    edges.extend(gd.get("edges", []))
         except Exception as exc:
             print(f"[chat_completions] pipeline failed: {exc!r}")
             spoken_q.put_nowait(_ERR_TEXT)
+            answer_parts.append(_ERR_TEXT)
         finally:
             spoken_q.put_nowait(_DONE)
+            if should_mirror and active_call:
+                active_call.event_queue.put_nowait(MirrorTurn(
+                    question=_last,
+                    answer="".join(answer_parts).strip(),
+                    citations=citations,
+                    graph_delta={"nodes": list(nodes.values()), "edges": edges},
+                ))
+                active_call.inflight_questions.discard(_last)
 
     task = asyncio.create_task(_drive())
     _BG_TASKS.add(task)

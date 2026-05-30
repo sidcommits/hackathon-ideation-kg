@@ -11,4 +11,11 @@ export type ChatEvent =
   | { type: "citation"; doc_title: string; sensitivity: string; chunk_text: string }
   | { type: "message_end"; stop_reason: string }
   | { type: "user_transcript"; text: string }
+  | {
+      type: "mirror_turn";
+      question: string;
+      answer: string;
+      citations: { doc_title: string; sensitivity: string; chunk_text: string }[];
+      graph_delta: GraphDelta;
+    }
   | { type: "error"; message: string };

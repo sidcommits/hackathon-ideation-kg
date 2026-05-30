@@ -153,6 +153,35 @@ export function reduce(state: ChatState, event: ChatEvent): ChatState {
         graph: { ...state.graph, pulsedIds: [] },
       };
 
+    case "mirror_turn": {
+      // One complete voice turn, atomic: append a user bubble + a fully-formed
+      // assistant bubble (answer + citations + subgraph). No streaming, so it
+      // can't interleave with other turns. Merge the subgraph into the live graph.
+      const byId = new Map(state.graph.nodes.map((n) => [n.id, n]));
+      const pulsed: string[] = [];
+      for (const n of event.graph_delta.nodes) {
+        if (!byId.has(n.id)) pulsed.push(n.id);
+        byId.set(n.id, n);
+      }
+      const edgeKey = (e: GraphEdge) => `${e.from}|${e.rel}|${e.to}`;
+      const edgeSet = new Map(state.graph.edges.map((e) => [edgeKey(e), e]));
+      for (const e of event.graph_delta.edges) edgeSet.set(edgeKey(e), e);
+
+      const userMsg: Message = { role: "user", text: event.question };
+      const assistantMsg: Message = {
+        role: "assistant",
+        text: event.answer,
+        citations: event.citations,
+        subgraph: { nodes: event.graph_delta.nodes, edges: event.graph_delta.edges },
+      };
+      return {
+        ...state,
+        messages: [...state.messages, userMsg, assistantMsg],
+        activeToolCalls: [],
+        graph: { nodes: [...byId.values()], edges: [...edgeSet.values()], pulsedIds: pulsed },
+      };
+    }
+
     case "error": {
       const messages = ensureAssistant(state.messages);
       const idx = messages.length - 1;

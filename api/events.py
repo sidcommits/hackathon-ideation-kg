@@ -50,6 +50,18 @@ class UserTranscript(BaseModel):
     text: str
 
 
+class MirrorTurn(BaseModel):
+    """One COMPLETE voice turn, mirrored atomically into the web chat: the user's
+    transcribed question plus the full detailed answer + citations. Delivered as a
+    single event (not a token stream) so concurrent/overlapping turns can never
+    interleave into one scrambled bubble."""
+    type: Literal["mirror_turn"] = "mirror_turn"
+    question: str
+    answer: str
+    citations: list[dict] = []
+    graph_delta: dict | GraphDelta = GraphDelta()
+
+
 class ErrorEvent(BaseModel):
     type: Literal["error"] = "error"
     message: str
@@ -57,7 +69,7 @@ class ErrorEvent(BaseModel):
 
 Event = Union[
     MessageStart, Token, ToolCall, ToolResult, Citation, MessageEnd,
-    UserTranscript, ErrorEvent,
+    UserTranscript, MirrorTurn, ErrorEvent,
 ]
 
 

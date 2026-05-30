@@ -75,19 +75,17 @@ export default function Home() {
     <main className="brain-canvas grid h-screen grid-cols-1 text-[color:var(--fg)] lg:grid-cols-[1fr_minmax(420px,500px)]">
       {/* ── Conversation column ─────────────────────────────── */}
       <section className="relative flex min-w-0 flex-col overflow-hidden">
-        <header className="flex items-center justify-between border-b border-[color:var(--line)] px-6 py-3.5">
-          <div className="flex items-center gap-3">
+        <header className="flex items-center justify-between border-b border-[color:var(--line)] px-6 py-4">
+          <div className="flex items-center gap-3.5">
             <BrandMark />
             <div className="leading-tight">
-              <div className="flex items-center gap-2 text-[13px] font-semibold tracking-tight text-[color:var(--fg)]">
-                SIX
-                <span className="text-[color:var(--fg-3)]">·</span>
-                <span className="font-medium text-[color:var(--fg-2)]">
-                  Company Brain
-                </span>
+              <div className="flex items-baseline gap-2">
+                <span className="display text-[19px] tracking-[0.02em] text-[color:var(--fg)]">SIX</span>
+                <span className="text-[color:var(--brass)]">·</span>
+                <span className="display text-[19px] italic text-[color:var(--fg-2)]">Company Brain</span>
               </div>
-              <div className="text-[length:var(--text-xs)] uppercase tracking-[0.18em] text-[color:var(--fg-3)]">
-                Regulatory Knowledge · Traced &amp; Governed
+              <div className="kicker mt-0.5 text-[length:var(--text-2xs)]">
+                Regulatory Reference · Traced &amp; Governed
               </div>
             </div>
           </div>
@@ -186,7 +184,7 @@ export default function Home() {
               busy={busy}
               startCall={startCall}
               isAgentRegistered={isAgentRegistered}
-              registerAgent={registerAgent}
+              onConfigure={() => setShowConfig(true)}
             />
           )}
         </div>
@@ -283,20 +281,15 @@ export default function Home() {
   );
 }
 
-/* ── Brand mark: a small synapse/constellation glyph ─────── */
+/* ── Colophon: an engraved brass monogram (institutional, monochrome) ─── */
 function BrandMark() {
   return (
-    <div className="relative grid h-9 w-9 place-items-center rounded-xl border border-[color:var(--line-2)] bg-[color:var(--bg-2)] shadow-[0_0_0_1px_rgba(255,255,255,0.02)_inset]">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <circle cx="12" cy="5" r="2" fill="var(--node-reasoning)" />
-        <circle cx="5" cy="16" r="2" fill="var(--node-backbone)" />
-        <circle cx="19" cy="16" r="2" fill="var(--node-provenance)" />
-        <circle cx="12" cy="13" r="1.5" fill="var(--accent)" />
-        <path
-          d="M12 5 12 13 M12 13 5 16 M12 13 19 16"
-          stroke="rgba(155,163,174,0.4)"
-          strokeWidth="1"
-        />
+    <div className="relative grid h-9 w-9 place-items-center rounded-md border border-[color:var(--brass-dim)]/60 bg-[color:var(--bg-2)]">
+      <span className="absolute inset-[3px] rounded-[3px] border border-[color:var(--brass-dim)]/30" aria-hidden />
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden className="text-[color:var(--brass)]">
+        {/* a bound-volume / open-ledger mark */}
+        <path d="M12 5c-2-1.4-4.2-1.6-6.5-1.2v13c2.3-.4 4.5-.2 6.5 1.2 2-1.4 4.2-1.6 6.5-1.2v-13C16.2 3.4 14 3.6 12 5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+        <path d="M12 5v13" stroke="currentColor" strokeWidth="1.4" />
       </svg>
     </div>
   );
@@ -308,8 +301,8 @@ function StatusPill({ busy }: { busy: boolean }) {
       <span
         className={`h-1.5 w-1.5 rounded-full ${
           busy
-            ? "bg-[color:var(--accent)] shadow-[0_0_8px_var(--accent-glow)] animate-pulse"
-            : "bg-[color:var(--node-backbone)]"
+            ? "bg-[color:var(--accent)] animate-pulse"
+            : "bg-[color:var(--brass)]"
         }`}
       />
       <span className="font-mono text-[length:var(--text-xs)] uppercase tracking-[0.15em] text-[color:var(--fg-3)]">
@@ -396,127 +389,80 @@ interface EmptyStateProps {
   busy: boolean;
   startCall: () => void;
   isAgentRegistered: boolean;
-  registerAgent: (publicUrl: string) => Promise<any>;
+  onConfigure: () => void;
 }
 
-function EmptyState({ onPick, busy, startCall, isAgentRegistered, registerAgent }: EmptyStateProps) {
-  const [tunnelInput, setTunnelInput] = useState("");
-  const [loading, setLoading] = useState(false);
-
+function EmptyState({ onPick, busy, startCall, isAgentRegistered, onConfigure }: EmptyStateProps) {
   return (
-    <div className="hero-stagger flex h-full flex-col items-center justify-center px-6 text-center">
-      <div className="relative mb-6 grid h-16 w-16 place-items-center rounded-2xl border border-[color:var(--line-2)] bg-[color:var(--bg-2)]">
-        <div className="absolute inset-0 rounded-2xl bg-[radial-gradient(circle_at_50%_30%,var(--accent-glow),transparent_70%)]" />
-        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden>
-          <circle cx="12" cy="5" r="2.2" fill="var(--node-reasoning)" />
-          <circle cx="5" cy="16" r="2.2" fill="var(--node-backbone)" />
-          <circle cx="19" cy="16" r="2.2" fill="var(--node-provenance)" />
-          <circle cx="12" cy="13" r="1.6" fill="var(--accent)" />
-          <path
-            d="M12 5 12 13 M12 13 5 16 M12 13 19 16"
-            stroke="rgba(155,163,174,0.45)"
-            strokeWidth="1.1"
-          />
-        </svg>
-      </div>
-
-      <span className="rule-red mx-auto mb-6" aria-hidden />
-
-      <h1 className="display max-w-2xl text-balance text-[34px] text-[color:var(--fg)] sm:text-[46px]">
-        Ask the institution&rsquo;s <em>memory</em>.
-      </h1>
-      <p className="mt-3 max-w-md text-pretty text-sm leading-relaxed text-[color:var(--fg-2)]">
-        Expert knowledge on instrument coverage and regulatory classification —
-        MiFID&nbsp;II, SFDR, FATCA — synthesised from source documents and SME
-        interviews, with every answer traced back to its citation.
-      </p>
-
-      {isAgentRegistered ? (
-        <div className="mt-6 flex flex-col items-center">
-          {/* Real-time Video Advisor trigger */}
-          <button
-            type="button"
-            onClick={startCall}
-            disabled={busy}
-            className="flex items-center gap-2.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-5 py-3 text-xs font-bold uppercase tracking-wider text-emerald-400 hover:bg-emerald-500/20 shadow-lg shadow-emerald-500/5 transition-all animate-pulse cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-              <line x1="12" x2="12" y1="19" y2="22" />
-            </svg>
-            Talk to Video Advisor
-          </button>
-          <div className="mt-2.5 flex items-center gap-1.5 text-[length:var(--text-xs)] text-emerald-400 bg-emerald-500/5 border border-emerald-500/10 rounded-full px-2.5 py-0.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
-            <span>Digital Human Advisor Ready</span>
-          </div>
+    <div className="flex h-full items-center px-6 sm:px-10 lg:px-16">
+      <div className="hero-stagger w-full max-w-2xl">
+        {/* Kicker */}
+        <div className="kicker flex items-center gap-3">
+          <span className="rule-red inline-block" aria-hidden style={{ animationDelay: "0.3s" }} />
+          The Company Brain — Regulatory Reference
         </div>
-      ) : (
-        <div className="mt-6 w-full max-w-sm rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 text-left backdrop-blur-sm">
-          <div className="flex items-center gap-2.5 mb-2">
-            <span className="flex h-2 w-2 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-            </span>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400">
-              Advisor Connection Required
-            </h3>
-          </div>
-          <p className="text-[length:var(--text-sm)] leading-normal text-[color:var(--fg-3)] mb-3.5">
-            Beyond Presence needs a public tunnel to hit your local brain. Copy your URL from the <code>npx localtunnel --port 8000</code> terminal window:
-          </p>
-          <div className="flex gap-2">
-            <input
-              type="url"
-              placeholder="https://example-tunnel.locallt.ly"
-              value={tunnelInput}
-              onChange={(e) => setTunnelInput(e.target.value)}
-              className="min-w-0 flex-1 rounded-lg border border-[color:var(--line-2)] bg-[color:var(--bg)] px-3 py-1.5 text-xs text-[color:var(--fg)] placeholder:text-[color:var(--fg-3)] outline-none focus:border-amber-500"
-            />
+
+        {/* Headline — editorial cover */}
+        <h1 className="display headline-print mt-5 text-balance text-[40px] leading-[1.02] text-[color:var(--fg)] sm:text-[58px]">
+          Ask the institution&rsquo;s <em>memory</em>.
+        </h1>
+
+        {/* Lede */}
+        <p className="mt-5 max-w-xl text-pretty text-[length:var(--text-md)] leading-relaxed text-[color:var(--fg-2)]">
+          Expert knowledge on instrument coverage and regulatory classification —
+          MiFID&nbsp;II, SFDR, FATCA — synthesised from source documents and SME
+          interviews, with every claim traced back to the passage it rests on.
+        </p>
+
+        {/* Numbered index of openings — a table of contents, not glass buttons */}
+        <div className="mt-9 border-t border-[color:var(--line)]">
+          {SUGGESTIONS.map((s, i) => (
+            <button
+              key={s}
+              type="button"
+              disabled={busy}
+              onClick={() => onPick(s)}
+              className="group flex w-full items-baseline gap-4 border-b border-[color:var(--line)] py-3.5 text-left transition-colors hover:bg-[color:var(--bg-2)]/40 disabled:opacity-50"
+            >
+              <span className="index-num w-7 shrink-0 pl-1 tabular-nums">{String(i + 1).padStart(2, "0")}</span>
+              <span className="flex-1 text-[length:var(--text-base)] text-[color:var(--fg-2)] transition-colors group-hover:text-[color:var(--fg)]">
+                {s}
+              </span>
+              <span className="shrink-0 translate-x-0 text-[color:var(--fg-3)] transition-all group-hover:translate-x-1 group-hover:text-[color:var(--brass)]">
+                <SendArrow />
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Video advisor — quiet, brass-outlined. Registration lives behind the gear. */}
+        <div className="mt-7">
+          {isAgentRegistered ? (
             <button
               type="button"
-              onClick={async () => {
-                if (!tunnelInput.trim()) return alert("Please enter a valid localtunnel URL");
-                setLoading(true);
-                try {
-                  await registerAgent(tunnelInput.trim());
-                } catch {}
-                setLoading(false);
-              }}
-              disabled={loading || !tunnelInput.trim()}
-              className="rounded-lg bg-amber-500 hover:bg-amber-600 px-3.5 py-1.5 text-xs font-bold text-black transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              onClick={startCall}
+              disabled={busy}
+              className="group inline-flex items-center gap-2.5 rounded-lg border border-[color:var(--brass-dim)]/60 bg-[color:var(--bg-2)]/50 px-4 py-2.5 text-[length:var(--text-sm)] text-[color:var(--fg-2)] transition-all hover:border-[color:var(--brass)] hover:text-[color:var(--fg)] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? "Connecting..." : "Register"}
+              <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--brass)]" aria-hidden />
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" x2="12" y1="19" y2="22" />
+              </svg>
+              Consult the Video Advisor
             </button>
-          </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onConfigure}
+              className="kicker inline-flex items-center gap-2 text-[length:var(--text-2xs)] text-[color:var(--fg-3)] transition-colors hover:text-[color:var(--brass)] cursor-pointer"
+            >
+              <span className="h-1 w-1 rounded-full bg-[color:var(--fg-3)]" aria-hidden />
+              Connect the video advisor in configuration
+            </button>
+          )}
         </div>
-      )}
-
-      <div className="mt-8 grid w-full max-w-md gap-2">
-        {SUGGESTIONS.map((s) => (
-          <button
-            key={s}
-            type="button"
-            disabled={busy}
-            onClick={() => onPick(s)}
-            className="group glass flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-left text-[13px] text-[color:var(--fg-2)] transition-all hover:border-[color:var(--line-2)] hover:text-[color:var(--fg)] disabled:opacity-50"
-          >
-            <span>{s}</span>
-            <span className="shrink-0 text-[color:var(--fg-3)] transition-transform group-hover:translate-x-0.5 group-hover:text-[color:var(--accent)]">
-              <SendArrow />
-            </span>
-          </button>
-        ))}
       </div>
     </div>
   );

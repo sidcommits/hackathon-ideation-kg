@@ -1,24 +1,32 @@
 import type { Metadata } from "next";
-import { Geist, JetBrains_Mono, Newsreader } from "next/font/google";
+import { Fraunces, Inter_Tight, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// ── Reading-Room type system ──────────────────────────────────────────────
+// Fraunces — a high-contrast, blade-serif editorial display. Verdicts,
+// headlines, answer headings. The "sharp serif" gravitas (Sectra-class).
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
   subsets: ["latin"],
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains-mono",
-  subsets: ["latin"],
-});
-
-// Editorial display serif — headlines & answer headings. Optical, high-contrast,
-// financial-editorial gravitas (classy, not futuristic).
-const newsreader = Newsreader({
-  variable: "--font-newsreader",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
+  weight: ["400", "500", "600"],
   style: ["normal", "italic"],
+  display: "swap",
+});
+
+// Inter Tight — a dense, neutral Swiss-grotesk for long regulatory prose & UI.
+const interTight = Inter_Tight({
+  variable: "--font-inter-tight",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+});
+
+// IBM Plex Mono — ledger / teletype voice: clearance, sensitivity chips,
+// breadcrumbs, citation numerals, provenance refs.
+const plexMono = IBM_Plex_Mono({
+  variable: "--font-plex-mono",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
   display: "swap",
 });
 
@@ -36,7 +44,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${jetbrainsMono.variable} ${newsreader.variable} h-full antialiased`}
+      className={`${fraunces.variable} ${interTight.variable} ${plexMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <head>

@@ -12,6 +12,10 @@ class ActiveCall:
     call_id: str
     max_sensitivity: str = "C2 Internal"
     event_queue: asyncio.Queue = field(default_factory=asyncio.Queue)
+    # Questions whose turn is CURRENTLY being processed. Guards against Beyond
+    # Presence firing /v1 twice for the SAME turn (concurrent duplicate bubbles)
+    # WITHOUT blocking a later re-ask of the same question.
+    inflight_questions: set = field(default_factory=set)
 
 
 ACTIVE_CALLS: dict[str, ActiveCall] = {}

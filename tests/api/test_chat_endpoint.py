@@ -136,18 +136,21 @@ def _drain_global_queue():
     return out
 
 
-def test_v1_routes_spoken_to_avatar_and_detail_to_queue(monkeypatch):
-    from api.events import MessageStart, Token, MessageEnd
+def test_v1_speaks_summary_and_mirrors_full_turn_atomically(monkeypatch):
+    import api.deps as deps
+    from api.events import MessageStart, Token, Citation, MessageEnd
 
     async def fake_agent(messages, *, mode="text", **kw):
         assert mode == "voice"                       # endpoint must request voice
         yield MessageStart(id="m")
         yield Token(text="SPOKEN_SUMMARY ", channel="spoken")
         yield Token(text="DETAIL_BODY", channel="detail")
+        yield Citation(doc_title="ESMA", sensitivity="C2 Internal", chunk_text="x")
         yield MessageEnd(stop_reason="end_turn")
 
     monkeypatch.setattr(main, "run_agent", fake_agent)
     _drain_global_queue()                            # isolate from prior tests
+    deps.ACTIVE_CALLS["hackathon-call-id"].inflight_questions.clear()
 
     client = TestClient(app)
     resp = client.post("/v1/chat/completions", json={
@@ -162,15 +165,43 @@ def test_v1_routes_spoken_to_avatar_and_detail_to_queue(monkeypatch):
     assert "DETAIL_BODY" not in body                 # full answer NOT spoken
 
     drained = _drain_global_queue()
-    types = [e.type for e in drained]
-    assert "user_transcript" in types
-    assert "message_start" in types
-    assert "message_end" in types
-    detail_tokens = [e for e in drained
-                     if e.type == "token" and e.channel == "detail"]
-    assert any("DETAIL_BODY" in e.text for e in detail_tokens)
-    ut = next(e for e in drained if e.type == "user_transcript")
-    assert ut.text == "Is the note covered?"
+    # Exactly ONE atomic mirror event carries the whole turn — no token stream.
+    turns = [e for e in drained if e.type == "mirror_turn"]
+    assert len(turns) == 1
+    turn = turns[0]
+    assert turn.question == "Is the note covered?"
+    assert turn.answer == "DETAIL_BODY"
+    assert turn.citations[0]["doc_title"] == "ESMA"
+    assert all(e.type not in {"token", "message_start", "message_end"} for e in drained)
+
+
+def test_v1_suppresses_concurrent_duplicate_but_allows_reask(monkeypatch):
+    import api.deps as deps
+    from api.events import Token, MessageEnd
+
+    async def fake_agent(messages, *, mode="text", **kw):
+        yield Token(text="hi ", channel="spoken")
+        yield Token(text="answer", channel="detail")
+        yield MessageEnd(stop_reason="end_turn")
+
+    monkeypatch.setattr(main, "run_agent", fake_agent)
+    call = deps.ACTIVE_CALLS["hackathon-call-id"]
+    _drain_global_queue()
+    call.inflight_questions.clear()
+
+    client = TestClient(app)
+    payload = {"messages": [{"role": "user", "content": "dup question"}], "stream": True}
+
+    # A concurrent duplicate (same question still in-flight) is suppressed.
+    call.inflight_questions.add("dup question")          # simulate the first call in-flight
+    client.post("/v1/chat/completions", json=payload)
+    assert [e for e in _drain_global_queue() if e.type == "mirror_turn"] == []
+
+    # A later re-ask (nothing in-flight) DOES mirror — re-asking is not blocked.
+    call.inflight_questions.clear()
+    client.post("/v1/chat/completions", json=payload)
+    turns = [e for e in _drain_global_queue() if e.type == "mirror_turn"]
+    assert len(turns) == 1 and turns[0].question == "dup question"
 
 
 def test_v1_chat_completions_failure_does_not_freeze(monkeypatch):
