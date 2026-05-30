@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Message } from "@/lib/chatReducer";
 import { buildSourceTree, type TreeNode } from "@/lib/sourceTree";
 import provenance from "@/lib/provenance.json";
@@ -98,6 +98,12 @@ function SourcesTree({ message }: { message: Message }) {
   // Expanded node labels (path-joined keys) and the selected document's path.
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [selectedPath, setSelectedPath] = useState<string[] | null>(null);
+
+  // Reset selection + expansion when switching to a different answer's tree.
+  useEffect(() => {
+    setOpen(new Set());
+    setSelectedPath(null);
+  }, [message]);
 
   const toggle = (key: string) =>
     setOpen((s) => {
