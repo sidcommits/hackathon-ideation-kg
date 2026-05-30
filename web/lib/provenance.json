@@ -1,0 +1,9 @@
+{
+  "EU_ESG_Template_20260410- EET V1.1.3_Editorial update (1).xlsx": { "chain": ["SharePoint", "Compliance Dept"] },
+  "EU_MIFID_Template_20251217 FinDatEx - EMT V4.3 (1).xlsx": { "chain": ["SharePoint", "Compliance Dept"] },
+  "US_FATCA.pdf": { "chain": ["GitHub", "Tax Engineering"] },
+  "US_six-factsheet-fatca-en.pdf": { "chain": ["GitHub", "Tax Engineering"] },
+  "EU-MiIFID_six-infographics-mifid-II-reference-data-en.pdf": { "chain": ["Confluence", "Reference Data"] },
+  "Confidential_SIX_master-data-openining-and-mutations-facsheet.pdf": { "chain": ["SharePoint", "Master Data Ops"] },
+  "__default__": { "chain": ["SharePoint", "Unfiled"] }
+}
