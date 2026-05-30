@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 .venv/
 .env
+*.egg-info/
+graph_viz*.html
+sample_corpus/
