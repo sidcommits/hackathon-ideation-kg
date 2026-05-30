@@ -186,3 +186,62 @@ class GraphStore:
             """,
             k=k, emb=query_embedding, allowed=allowed,
         )
+
+    @staticmethod
+    def _nid(label: str, name: str) -> str:
+        return f"{label}:{name}"
+
+    def touched_subgraph(self, chunk_ids: list[str]) -> dict:
+        """Nodes/edges touched by a set of chunks: the chunks, their documents,
+        and the entities mentioned in them. IDs are '<Label>:<name>' / 'Chunk:<id>'."""
+        rows = self.run(
+            """
+            UNWIND $chunk_ids AS cid
+            MATCH (c:Chunk {chunk_id: cid})-[:PART_OF]->(d:Document)
+            OPTIONAL MATCH (e)-[:MENTIONED_IN]->(c)
+            WHERE e:Regulation OR e:DataAttribute OR e:InstrumentType
+               OR e:Obligation OR e:Concept
+            RETURN c.chunk_id AS chunk_id, d.doc_id AS doc_id, d.title AS doc_title,
+                   collect(DISTINCT {label: head(labels(e)), name: e.name}) AS entities
+            """,
+            chunk_ids=chunk_ids,
+        )
+        nodes: dict[str, dict] = {}
+        edges: list[dict] = []
+        for r in rows:
+            chunk_node = f"Chunk:{r['chunk_id']}"
+            doc_node = f"Document:{r['doc_id']}"
+            nodes[chunk_node] = {"id": chunk_node, "label": "Chunk"}
+            nodes[doc_node] = {"id": doc_node, "label": "Document", "title": r.get("doc_title")}
+            edges.append({"from": chunk_node, "to": doc_node, "rel": "PART_OF"})
+            for e in r["entities"]:
+                if not e or not e.get("name"):
+                    continue
+                eid = self._nid(e["label"], e["name"])
+                nodes[eid] = {"id": eid, "label": e["label"], "name": e["name"]}
+                edges.append({"from": eid, "to": chunk_node, "rel": "MENTIONED_IN"})
+        return {"nodes": list(nodes.values()), "edges": edges}
+
+    def neighborhood(self, entity_name: str, limit: int = 25) -> dict:
+        """1-hop backbone/reasoning neighborhood around a named entity."""
+        rows = self.run(
+            """
+            MATCH (s {name: $name})-[r]->(t)
+            WHERE (s:Regulation OR s:DataAttribute OR s:InstrumentType OR s:Obligation OR s:Concept)
+              AND (t:Regulation OR t:DataAttribute OR t:InstrumentType OR t:Obligation OR t:Concept)
+            RETURN {label: head(labels(s)), name: s.name} AS src,
+                   type(r) AS rel,
+                   {label: head(labels(t)), name: t.name} AS dst
+            LIMIT $limit
+            """,
+            name=entity_name, limit=limit,
+        )
+        nodes: dict[str, dict] = {}
+        edges: list[dict] = []
+        for r in rows:
+            s, d = r["src"], r["dst"]
+            sid, did = self._nid(s["label"], s["name"]), self._nid(d["label"], d["name"])
+            nodes[sid] = {"id": sid, "label": s["label"], "name": s["name"]}
+            nodes[did] = {"id": did, "label": d["label"], "name": d["name"]}
+            edges.append({"from": sid, "to": did, "rel": r["rel"]})
+        return {"nodes": list(nodes.values()), "edges": edges}
