@@ -52,7 +52,7 @@
 
 /* ============================================================
    LIGHT MODE — clean institutional daylight (Linear / Stripe tone)
-   Cool off-white canvas, ink-slate text, same teal accent.
+   Cool off-white canvas, ink-slate text, SIX red accent.
    ============================================================ */
 :root[data-theme="light"] {
   --bg:        #F7F8FA;
