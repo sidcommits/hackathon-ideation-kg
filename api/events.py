@@ -29,7 +29,7 @@ class ToolResult(BaseModel):
     type: Literal["tool_result"] = "tool_result"
     id: str
     summary: str
-    graph_delta: GraphDelta | dict = GraphDelta()
+    graph_delta: dict | GraphDelta = GraphDelta()
 
 
 class Citation(BaseModel):
