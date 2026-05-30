@@ -26,7 +26,12 @@ function ensureAssistant(messages: Message[]): Message[] {
 }
 
 export function appendUser(state: ChatState, text: string): ChatState {
-  return { ...state, messages: [...state.messages, { role: "user", text }] };
+  return {
+    ...state,
+    messages: [...state.messages, { role: "user", text }],
+    activeToolCalls: [],
+    graph: { ...state.graph, pulsedIds: [] },
+  };
 }
 
 export function reduce(state: ChatState, event: ChatEvent): ChatState {
@@ -88,8 +93,15 @@ export function reduce(state: ChatState, event: ChatEvent): ChatState {
       return { ...state, messages: [...messages.slice(0, idx), updated] };
     }
 
+    case "error": {
+      const messages = ensureAssistant(state.messages);
+      const idx = messages.length - 1;
+      const cur = messages[idx];
+      const updated = { ...cur, text: cur.text + `\n\n⚠️ Error: ${event.message}` };
+      return { ...state, messages: [...messages.slice(0, idx), updated] };
+    }
+
     case "message_end":
-    case "error":
     default:
       return state;
   }
