@@ -3,6 +3,7 @@ import { useCallback, useRef, useState, useEffect } from "react";
 import { ChatState, initialState, reduce, appendUser } from "@/lib/chatReducer";
 import { parseSSEChunk } from "@/lib/parseEventStream";
 import type { ChatEvent } from "@/lib/events";
+import type { Reflection, Truth } from "@/lib/learnings";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -19,6 +20,10 @@ export function useChat() {
   const [activeCall, setActiveCall] = useState<CallDetails | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isAgentRegistered, setIsAgentRegistered] = useState(false);
+  const [reflection, setReflection] = useState<Reflection | null>(null);
+  const [reflecting, setReflecting] = useState(false);
+  const [ingesting, setIngesting] = useState(false);
+  const [learnedFlash, setLearnedFlash] = useState<string | null>(null);
 
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -59,6 +64,58 @@ export function useChat() {
     }
   }, [clearance]);
 
+  // ── Recursive improvement: distill chat → truths (read-only), preview, ingest ──
+  const reflect = useCallback(async () => {
+    const msgs = stateRef.current.messages
+      .filter((m) => m.text.trim().length > 0)
+      .map((m) => ({ role: m.role, content: m.text }));
+    if (msgs.length === 0) return;
+    setReflecting(true);
+    try {
+      const resp = await fetch(`${API}/reflect`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ messages: msgs, max_sensitivity: clearance }),
+      });
+      const data = await resp.json();
+      if (data.ok !== false) {
+        setReflection({ summary: data.summary ?? "", truths: data.truths ?? [] });
+      }
+    } catch (e) {
+      console.error("reflect failed:", e);
+    } finally {
+      setReflecting(false);
+    }
+  }, [clearance]);
+
+  const ingestLearnings = useCallback(async (selected: Truth[]) => {
+    if (selected.length === 0) {
+      setReflection(null);
+      return;
+    }
+    setIngesting(true);
+    try {
+      const resp = await fetch(`${API}/learnings/ingest`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ truths: selected, max_sensitivity: clearance }),
+      });
+      const data = await resp.json();
+      setLearnedFlash(
+        data.ok === false
+          ? "Could not save learnings."
+          : `Saved ${data.chunks_written} learning(s) to the brain.`,
+      );
+      setReflection(null);
+    } catch {
+      setLearnedFlash("Could not save learnings.");
+    } finally {
+      setIngesting(false);
+    }
+  }, [clearance]);
+
+  const dismissReflection = useCallback(() => setReflection(null), []);
+
   // Beyond Presence WebRTC Call Starter (Free Tier Iframe Fallback)
   const startCall = useCallback(async () => {
     setBusy(true);
@@ -93,15 +150,15 @@ export function useChat() {
     }
   }, [clearance]);
 
-  // End active call
+  // End active call. Do NOT close the live-events EventSource here — it's the
+  // persistent web-mirror channel (owned by the mount effect, closed on unmount).
+  // Closing it mid-turn truncated the last answer (caret stuck, half-rendered
+  // bubble) and killed the mirror for the rest of the session.
   const endCall = useCallback(() => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
     setActiveCall(null);
     setIsSpeaking(false);
-  }, []);
+    void reflect();
+  }, [reflect]);
 
   // Beyond Presence Agent Setup / Registration
   const registerAgent = useCallback(async (publicUrl: string) => {
@@ -164,6 +221,9 @@ export function useChat() {
     // Initialize persistent parallel EventSource stream to capture dynamic GraphRAG deltas
     const es = new EventSource(`${API}/api/calls/hackathon-call-id/events`);
     eventSourceRef.current = es;
+    // True once WE close it (unmount / Strict-Mode double-invoke), so the abort it
+    // triggers isn't mistaken for a real failure.
+    let intentionalClose = false;
 
     es.onmessage = (event) => {
       try {
@@ -181,13 +241,17 @@ export function useChat() {
     };
 
     es.onerror = () => {
-      console.error("Parallel call events SSE tunnel encountered an error.");
+      // EventSource auto-reconnects on transient drops (readyState CONNECTING),
+      // and Strict Mode's cleanup aborts the first connection — both are normal.
+      // Only a permanently CLOSED stream that we didn't close ourselves matters.
+      if (intentionalClose || es.readyState !== EventSource.CLOSED) return;
+      console.warn("Company Brain live-events stream closed unexpectedly.");
     };
 
     return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
+      intentionalClose = true;
+      es.close();
+      eventSourceRef.current = null;
     };
   }, []);
 
@@ -203,5 +267,13 @@ export function useChat() {
     isSpeaking,
     registerAgent,
     isAgentRegistered,
+    reflection,
+    reflecting,
+    ingesting,
+    reflect,
+    ingestLearnings,
+    dismissReflection,
+    learnedFlash,
+    clearLearnedFlash: () => setLearnedFlash(null),
   };
 }

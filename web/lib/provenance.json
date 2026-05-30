@@ -1,28 +1,30 @@
 {
-  "EU_MiFID_CELEX_32014L0065_EN_TXT.pdf": { "chain": ["Confluence", "Regulatory Library"] },
-  "EU_MIFIR_CELEX_32014R0600_EN_TXT.pdf": { "chain": ["Confluence", "Regulatory Library"] },
-  "EU_MiFID_2015-1787_-_guidelines_on_complex_debt_instruments_and_structured_deposits.pdf": { "chain": ["Confluence", "Regulatory Library"] },
-  "EU_MiFID_esma35-43-620_guidelines_on_mifid_ii_product_governance_requirements_0.pdf": { "chain": ["Confluence", "Regulatory Library"] },
-  "EU_SFDR_CELEX_32019R2088_EN_TXT.pdf": { "chain": ["Confluence", "Regulatory Library"] },
-  "EU_SFDR_jc_2021_03_joint_esas_final_report_on_rts_under_sfdr.pdf": { "chain": ["Confluence", "Regulatory Library"] },
-  "EU_ESG_jc_2021_50_-_final_report_on_taxonomy-related_product_disclosure_rts.pdf": { "chain": ["Confluence", "Regulatory Library"] },
+  "EU_MiFID_CELEX_32014L0065_EN_TXT.pdf": { "chain": ["Confluence", "Regulatory Library"], "url": "https://six-group.atlassian.net/wiki/spaces/REGLIB/pages/393217/MiFID-II-Directive-2014-65-EU" },
+  "EU_MIFIR_CELEX_32014R0600_EN_TXT.pdf": { "chain": ["Confluence", "Regulatory Library"], "url": "https://six-group.atlassian.net/wiki/spaces/REGLIB/pages/393245/MiFIR-Regulation-600-2014" },
+  "EU_MiFID_2015-1787_-_guidelines_on_complex_debt_instruments_and_structured_deposits.pdf": { "chain": ["Confluence", "Regulatory Library"], "url": "https://six-group.atlassian.net/wiki/spaces/REGLIB/pages/393261/ESMA-Guidelines-Complex-Debt-Instruments" },
+  "EU_MiFID_esma35-43-620_guidelines_on_mifid_ii_product_governance_requirements_0.pdf": { "chain": ["Confluence", "Regulatory Library"], "url": "https://six-group.atlassian.net/wiki/spaces/REGLIB/pages/393288/ESMA-MiFID-II-Product-Governance-Guidelines" },
+  "EU_SFDR_CELEX_32019R2088_EN_TXT.pdf": { "chain": ["Confluence", "Regulatory Library"], "url": "https://six-group.atlassian.net/wiki/spaces/REGLIB/pages/393301/SFDR-Regulation-2019-2088" },
+  "EU_SFDR_jc_2021_03_joint_esas_final_report_on_rts_under_sfdr.pdf": { "chain": ["Confluence", "Regulatory Library"], "url": "https://six-group.atlassian.net/wiki/spaces/REGLIB/pages/393333/ESAs-Final-Report-RTS-under-SFDR" },
+  "EU_ESG_jc_2021_50_-_final_report_on_taxonomy-related_product_disclosure_rts.pdf": { "chain": ["Confluence", "Regulatory Library"], "url": "https://six-group.atlassian.net/wiki/spaces/REGLIB/pages/393360/ESAs-Final-Report-Taxonomy-Product-Disclosure-RTS" },
+  "US_FATCA.pdf": { "chain": ["Confluence", "Regulatory Library"], "url": "https://six-group.atlassian.net/wiki/spaces/REGLIB/pages/393402/US-FATCA-Reference" },
+  "US_six-factsheet-fatca-en.pdf": { "chain": ["Confluence", "Regulatory Library"], "url": "https://six-group.atlassian.net/wiki/spaces/REGLIB/pages/393421/SIX-FATCA-Factsheet" },
 
-  "EU-MiIFID_six-infographics-mifid-II-reference-data-en.pdf": { "chain": ["Confluence", "Reference Data"] },
-  "six-handbook-regulatory-navigator-en.pdf": { "chain": ["Confluence", "Product Knowledge Base"] },
-  "six-handbook-tax-navigator-en.pdf": { "chain": ["Confluence", "Product Knowledge Base"] },
+  "EU-MiIFID_six-infographics-mifid-II-reference-data-en.pdf": { "chain": ["Confluence", "Reference Data"], "url": "https://six-group.atlassian.net/wiki/spaces/REFDATA/pages/655401/MiFID-II-Reference-Data-Infographic" },
 
-  "EU_ESG_Template_20260410- EET V1.1.3_Editorial update (1).xlsx": { "chain": ["SharePoint", "Compliance Dept"] },
-  "EU_MIFID_Template_20251217 FinDatEx - EMT V4.3 (1).xlsx": { "chain": ["SharePoint", "Compliance Dept"] },
+  "six-handbook-regulatory-navigator-en.pdf": { "chain": ["Confluence", "Product Knowledge Base"], "url": "https://six-group.atlassian.net/wiki/spaces/PKB/pages/720911/SIX-Regulatory-Navigator-Handbook" },
+  "six-handbook-tax-navigator-en.pdf": { "chain": ["Confluence", "Product Knowledge Base"], "url": "https://six-group.atlassian.net/wiki/spaces/PKB/pages/720933/SIX-Tax-Navigator-Handbook" },
 
-  "Product Coverage transcript (1).docx": { "chain": ["SharePoint", "SME Interviews"] },
-  "Regulatory Update transcript.docx": { "chain": ["SharePoint", "SME Interviews"] },
+  "EU_ESG_Template_20260410- EET V1.1.3_Editorial update (1).xlsx": { "chain": ["SharePoint", "Compliance Dept"], "url": "https://sixgroup.sharepoint.com/sites/Compliance/Shared%20Documents/Templates/EET_V1.1.3_EU_ESG_Template.xlsx" },
+  "EU_MIFID_Template_20251217 FinDatEx - EMT V4.3 (1).xlsx": { "chain": ["SharePoint", "Compliance Dept"], "url": "https://sixgroup.sharepoint.com/sites/Compliance/Shared%20Documents/Templates/EMT_V4.3_FinDatEx_EU_MiFID_Template.xlsx" },
 
-  "Confidential_SIX_master-data-openining-and-mutations-facsheet.pdf": { "chain": ["SharePoint", "Master Data Ops"] },
-  "Start Hack ZH_SIX_Presentation.pdf": { "chain": ["SharePoint", "Project Workspace"] },
+  "Confidential_SIX_master-data-openining-and-mutations-facsheet.pdf": { "chain": ["SharePoint", "Master Data Ops"], "url": "https://sixgroup.sharepoint.com/sites/MasterDataOps/Shared%20Documents/Factsheets/SIX_Master-Data-Opening-and-Mutations-Factsheet.pdf" },
 
-  "US_FATCA.pdf": { "chain": ["GitHub", "Tax Engineering"] },
-  "US_six-factsheet-fatca-en.pdf": { "chain": ["GitHub", "Tax Engineering"] },
-  "SIX_Data Attributes.xlsx": { "chain": ["GitHub", "Reference Data Platform"] },
+  "SIX_Data Attributes.xlsx": { "chain": ["SharePoint", "Reference Data"], "url": "https://sixgroup.sharepoint.com/sites/ReferenceData/Shared%20Documents/SIX_Data_Attributes.xlsx" },
 
-  "__default__": { "chain": ["SharePoint", "Unfiled"] }
+  "Product Coverage transcript (1).docx": { "chain": ["Google Docs", "SME Interviews"], "url": "https://docs.google.com/document/d/1pCov3rageTr4nscriptSMEa1B2c3D4e5/edit" },
+  "Regulatory Update transcript.docx": { "chain": ["Google Docs", "SME Interviews"], "url": "https://docs.google.com/document/d/1regUpd4teTr4nscriptSMEx9Y8z7W6v5/edit" },
+
+  "Start Hack ZH_SIX_Presentation.pdf": { "chain": ["Google Docs", "Project Workspace"], "url": "https://docs.google.com/presentation/d/1st4rtH4ckZHSIXpres3nt4ti0nQ2w3e4/edit" },
+
+  "__default__": { "chain": ["Confluence", "Unfiled"], "url": "https://six-group.atlassian.net/wiki/spaces/REGLIB/overview" }
 }

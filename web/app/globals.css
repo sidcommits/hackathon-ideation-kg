@@ -8,12 +8,12 @@
    ============================================================ */
 
 :root {
-  /* Deep-space canvas */
-  --bg:        #0A0B0D;
-  --bg-2:      #0E1014;   /* raised surface */
-  --bg-3:      #14171C;   /* card / input */
-  --line:      #1C2026;   /* hairline borders */
-  --line-2:    #262B33;   /* stronger borders / hover */
+  /* Charcoal canvas (lifted from near-black for a softer, less murky dark mode) */
+  --bg:        #111317;
+  --bg-2:      #171A20;   /* raised surface */
+  --bg-3:      #1E222A;   /* card / input */
+  --line:      #272C34;   /* hairline borders */
+  --line-2:    #343A44;   /* stronger borders / hover */
 
   /* Type */
   --fg:        #E7EAEE;   /* primary text */
@@ -88,6 +88,7 @@
   --color-foreground: var(--fg);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-jetbrains-mono);
+  --font-display: var(--font-newsreader);
 }
 
 html,
@@ -117,9 +118,25 @@ body,
   position: relative;
   isolation: isolate;
   background:
-    radial-gradient(120% 80% at 50% -20%, rgba(236, 0, 22, 0.07), transparent 60%),
-    radial-gradient(90% 60% at 100% 0%, rgba(96, 165, 250, 0.05), transparent 55%),
+    radial-gradient(130% 82% at 50% -25%, rgba(236, 0, 22, 0.10), transparent 58%),
+    radial-gradient(80% 52% at 100% -5%, rgba(96, 165, 250, 0.045), transparent 55%),
+    radial-gradient(125% 95% at 50% 122%, rgba(0, 0, 0, 0.42), transparent 55%),
     var(--bg);
+}
+/* Fine film grain — a refined print texture for depth (kept very subtle). */
+.brain-canvas::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.04;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+:root[data-theme="light"] .brain-canvas::after {
+  opacity: 0.025;
+  mix-blend-mode: multiply;
 }
 .brain-canvas::before {
   content: "";
@@ -244,15 +261,54 @@ body,
   animation: hero-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Staggered entrance for hero children — one orchestrated reveal on load. */
+.hero-stagger > * {
+  animation: hero-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.hero-stagger > *:nth-child(1) { animation-delay: 0.05s; }
+.hero-stagger > *:nth-child(2) { animation-delay: 0.16s; }
+.hero-stagger > *:nth-child(3) { animation-delay: 0.27s; }
+.hero-stagger > *:nth-child(4) { animation-delay: 0.38s; }
+.hero-stagger > *:nth-child(5) { animation-delay: 0.49s; }
+.hero-stagger > *:nth-child(6) { animation-delay: 0.60s; }
+
+/* Editorial display serif — for the hero headline & section gravitas. */
+.display {
+  font-family: var(--font-display), Georgia, "Times New Roman", serif;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  line-height: 1.05;
+  font-feature-settings: "liga", "dlig";
+}
+.display em {
+  font-style: italic;
+  font-weight: 400;
+}
+
+/* A precise SIX-red rule — an editorial mark that draws itself in. */
+.rule-red {
+  height: 2px;
+  width: 0;
+  border-radius: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+  animation: rule-grow 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.5s forwards;
+}
+@keyframes rule-grow {
+  to { width: 52px; }
+}
+
 /* ---- Glass elevation utility ---- */
 .glass {
-  background: linear-gradient(180deg, var(--glass-top), transparent 40%),
+  background:
+    linear-gradient(180deg, var(--glass-top), transparent 42%),
     var(--bg-3);
   border: 1px solid var(--line);
   box-shadow:
     0 1px 0 0 var(--glass-inset) inset,
-    0 8px 24px -12px var(--glass-shadow);
-  backdrop-filter: blur(8px);
+    0 1px 2px -1px var(--glass-shadow),
+    0 14px 36px -18px var(--glass-shadow);
+  backdrop-filter: blur(10px) saturate(120%);
 }
 
 /* ---- Focus ring on input ---- */
@@ -325,6 +381,9 @@ body,
 }
 .prose :where(h1, h2, h3, h4, h5, h6) {
   color: var(--fg);
+  font-family: var(--font-display), Georgia, serif;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 .prose :where(ol > li)::marker,
 .prose :where(ul > li)::marker {
@@ -335,6 +394,52 @@ body,
 }
 .prose :where(p):last-child {
   margin-bottom: 0;
+}
+
+/* GFM tables (parsed via remark-gfm): gridlines from our line tokens, a tinted
+   header, and horizontal scroll so a wide table never overflows the chat bubble. */
+.prose :where(table) {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 0.9em 0;
+  font-size: 0.92em;
+}
+.prose :where(thead) {
+  background: var(--bg-2);
+}
+.prose :where(th) {
+  font-weight: 650;
+  text-align: left;
+}
+.prose :where(th, td) {
+  border: 1px solid var(--line);
+  padding: 0.4em 0.7em;
+  vertical-align: top;
+}
+
+/* Citation-click focus: briefly ring + tint the targeted document row in the
+   Sources tree, so the eye lands on the file the user clicked in the chat. */
+@keyframes source-focus-pulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--accent-glow);
+    background-color: color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+  60% {
+    box-shadow: 0 0 0 3px var(--accent-glow);
+    background-color: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    background-color: transparent;
+  }
+}
+.source-focus-pulse {
+  animation: source-focus-pulse 1.4s ease-out;
+  outline: 1px solid var(--accent-dim);
+  outline-offset: -1px;
 }
 
 @media (prefers-reduced-motion: reduce) {

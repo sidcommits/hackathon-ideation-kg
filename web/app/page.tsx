@@ -1,12 +1,16 @@
 "use client";
 import { useState } from "react";
+import { useDictation } from "@/lib/useDictation";
 import { useChat } from "@/lib/useChat";
 import { ChatThread } from "@/components/ChatThread";
-import { GraphCanvas } from "@/components/GraphCanvas";
+// GraphCanvas retained intentionally (state.graph is still populated) — the graph
+// visualization was removed from the layout in favor of the docked Sources panel.
+// import { GraphCanvas } from "@/components/GraphCanvas";
 import { ClearanceSelector } from "@/components/ClearanceSelector";
 import { AvatarStage } from "@/components/AvatarStage";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { SourcesPanel } from "@/components/SourcesPanel";
+import { SourcesPanel, DockedSourcesPanel } from "@/components/SourcesPanel";
+import { LearningsPreview } from "@/components/LearningsPreview";
 import type { Message } from "@/lib/chatReducer";
 
 export default function Home() {
@@ -22,6 +26,14 @@ export default function Home() {
     isSpeaking,
     registerAgent,
     isAgentRegistered,
+    reflection,
+    reflecting,
+    ingesting,
+    reflect,
+    ingestLearnings,
+    dismissReflection,
+    learnedFlash,
+    clearLearnedFlash,
   } = useChat();
 
   const [input, setInput] = useState("");
@@ -30,17 +42,29 @@ export default function Home() {
   const [registering, setRegistering] = useState(false);
   const hasMessages = state.messages.length > 0;
 
-  // Sources & Relations slide-in panel.
+  // Sources panel: which answer it shows, and (when a citation is clicked) which
+  // document to expand-to + highlight. focusNonce re-fires the highlight on repeat clicks.
   const [sourcesMsg, setSourcesMsg] = useState<Message | null>(null);
   const [sourcesOpen, setSourcesOpen] = useState(false);
-  const openSources = (m: Message) => {
+  const [focusDoc, setFocusDoc] = useState<string | null>(null);
+  const [focusNonce, setFocusNonce] = useState(0);
+  // A citation chip was clicked in the chat → show that answer's tree, expand to
+  // the clicked document, and pulse it (docked panel on desktop, slide-over on mobile).
+  const selectSource = (m: Message, docTitle: string) => {
     setSourcesMsg(m);
+    setFocusDoc(docTitle);
+    setFocusNonce((n) => n + 1);
     setSourcesOpen(true);
   };
   const latestAnswer = [...state.messages].reverse().find((m) => m.role === "assistant") ?? null;
 
+  // Near-realtime mic dictation via OpenAI transcription. Each re-transcribe
+  // returns the FULL transcript of the clip so far, so we replace the input with it.
+  const mic = useDictation({ onText: (text) => setInput(text) });
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (mic.recording) void mic.stop();
     const q = input.trim();
     if (!q || busy) return;
     setInput("");
@@ -74,6 +98,16 @@ export default function Home() {
               disabled={busy || !!activeCall}
             />
             <StatusPill busy={busy} />
+            {state.messages.some((m) => m.role === "assistant") && (
+              <button
+                onClick={() => void reflect()}
+                disabled={reflecting}
+                className="rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-2)]/70 px-2.5 py-1 text-[length:var(--text-xs)] font-medium uppercase tracking-[0.12em] text-[color:var(--fg-2)] transition-colors hover:border-[color:var(--accent-dim)] hover:text-[color:var(--accent)] disabled:opacity-40 cursor-pointer"
+                title="Distill this chat and teach the Company Brain"
+              >
+                {reflecting ? "Reflecting…" : "Teach the Brain"}
+              </button>
+            )}
             <ThemeToggle />
             <button
               onClick={() => setShowConfig(!showConfig)}
@@ -139,12 +173,12 @@ export default function Home() {
                 />
               </div>
               <div className="h-[220px] overflow-y-auto border border-[color:var(--line)] rounded-2xl bg-[color:var(--bg-2)]/30 p-4">
-                <ChatThread state={state} onOpenSources={openSources} />
+                <ChatThread state={state} onSelectSource={selectSource} />
               </div>
             </div>
           ) : hasMessages ? (
             <div className="mx-auto max-w-3xl px-6 py-6">
-              <ChatThread state={state} onOpenSources={openSources} />
+              <ChatThread state={state} onSelectSource={selectSource} />
             </div>
           ) : (
             <EmptyState
@@ -168,10 +202,13 @@ export default function Home() {
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask the company brain…"
+                  placeholder={mic.recording ? "Listening…" : "Ask the company brain…"}
                   aria-label="Ask the company brain"
                   className="min-w-0 flex-1 bg-transparent py-1 text-[15px] text-[color:var(--fg)] placeholder:text-[color:var(--fg-3)] outline-none"
                 />
+                {mic.supported && (
+                  <MicButton listening={mic.recording} busy={mic.busy} onClick={mic.toggle} />
+                )}
                 <button
                   type="submit"
                   disabled={busy || !input.trim()}
@@ -187,7 +224,8 @@ export default function Home() {
             </div>
           </form>
         )}
-        {/* Left-edge toggle for the Sources & Relations tree */}
+        {/* Left-edge toggle for the Sources slide-over — narrow screens only
+            (on lg+ the docked Sources column is always visible). */}
         {hasMessages && !sourcesOpen && (
           <button
             type="button"
@@ -195,9 +233,9 @@ export default function Home() {
               setSourcesMsg(latestAnswer);
               setSourcesOpen(true);
             }}
-            className="group absolute left-0 top-1/2 z-20 flex -translate-y-1/2 items-center gap-1.5 rounded-r-xl border border-l-0 border-[color:var(--line)] bg-[color:var(--bg-2)]/85 py-3 pl-1.5 pr-2 text-[color:var(--fg-3)] backdrop-blur-md transition-colors hover:text-[color:var(--accent)] cursor-pointer"
-            title="Sources & Relations"
-            aria-label="Open sources and relations panel"
+            className="group absolute left-0 top-1/2 z-20 flex -translate-y-1/2 items-center gap-1.5 rounded-r-xl border border-l-0 border-[color:var(--line)] bg-[color:var(--bg-2)]/85 py-3 pl-1.5 pr-2 text-[color:var(--fg-3)] backdrop-blur-md transition-colors hover:text-[color:var(--accent)] cursor-pointer lg:hidden"
+            title="Sources"
+            aria-label="Open sources panel"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M9 6l6 6-6 6" />
@@ -208,18 +246,39 @@ export default function Home() {
           </button>
         )}
 
-        {/* Sources & Relations slide-in panel */}
+        {/* Sources slide-over panel (narrow screens) */}
         <SourcesPanel
           message={sourcesMsg}
           open={sourcesOpen}
           onClose={() => setSourcesOpen(false)}
+          focusDoc={focusDoc}
+          focusNonce={focusNonce}
         />
       </section>
 
-      {/* ── Knowledge-graph column ──────────────────────────── */}
+      {/* ── Sources & Relations column (replaces the graph viz; GraphCanvas code retained) ── */}
       <aside className="relative hidden border-l border-[color:var(--line)] bg-[color:var(--bg)] lg:block">
-        <GraphCanvas graph={state.graph} />
+        <DockedSourcesPanel message={sourcesMsg ?? latestAnswer} focusDoc={focusDoc} focusNonce={focusNonce} />
       </aside>
+
+      {/* Recursive improvement: preview distilled truths, accept/reject before ingest */}
+      {reflection && (
+        <LearningsPreview
+          reflection={reflection}
+          ingesting={ingesting}
+          onAccept={ingestLearnings}
+          onReject={dismissReflection}
+        />
+      )}
+      {learnedFlash && (
+        <button
+          type="button"
+          onClick={clearLearnedFlash}
+          className="fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-full border border-[color:var(--line-2)] bg-[color:var(--bg-2)]/95 px-4 py-2 text-[length:var(--text-sm)] text-[color:var(--fg)] shadow-xl backdrop-blur cursor-pointer"
+        >
+          {learnedFlash}
+        </button>
+      )}
     </main>
   );
 }
@@ -289,6 +348,42 @@ function SendArrow() {
   );
 }
 
+/* Mic button — near-realtime dictation (OpenAI transcription via /api/transcribe). */
+function MicButton({
+  listening,
+  busy,
+  onClick,
+}: {
+  listening: boolean;
+  busy?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={listening ? "Stop dictation" : "Dictate with microphone"}
+      aria-pressed={listening}
+      title={listening ? "Stop dictation" : "Speak to dictate"}
+      className={`relative grid h-8 w-8 shrink-0 place-items-center rounded-xl border transition-all cursor-pointer ${
+        listening
+          ? "border-[color:var(--accent-dim)] bg-[color:var(--accent-glow)] text-[color:var(--accent)] animate-pulse"
+          : "border-[color:var(--line-2)] bg-[color:var(--bg-2)] text-[color:var(--fg-2)] hover:border-[color:var(--accent-dim)] hover:text-[color:var(--fg)]"
+      }`}
+    >
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <rect x="9" y="2" width="6" height="12" rx="3" />
+        <path d="M5 10v2a7 7 0 0 0 14 0v-2" />
+        <line x1="12" x2="12" y1="19" y2="22" />
+      </svg>
+      {/* transcription in-flight dot */}
+      {listening && busy && (
+        <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[color:var(--accent)] shadow-[0_0_6px_var(--accent-glow)]" />
+      )}
+    </button>
+  );
+}
+
 /* ── Welcoming hero / empty state ────────────────────────── */
 const SUGGESTIONS = [
   "Is an ESG-linked structured note complex under MiFID II?",
@@ -309,7 +404,7 @@ function EmptyState({ onPick, busy, startCall, isAgentRegistered, registerAgent 
   const [loading, setLoading] = useState(false);
 
   return (
-    <div className="hero-rise flex h-full flex-col items-center justify-center px-6 text-center">
+    <div className="hero-stagger flex h-full flex-col items-center justify-center px-6 text-center">
       <div className="relative mb-6 grid h-16 w-16 place-items-center rounded-2xl border border-[color:var(--line-2)] bg-[color:var(--bg-2)]">
         <div className="absolute inset-0 rounded-2xl bg-[radial-gradient(circle_at_50%_30%,var(--accent-glow),transparent_70%)]" />
         <svg width="34" height="34" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -325,8 +420,10 @@ function EmptyState({ onPick, busy, startCall, isAgentRegistered, registerAgent 
         </svg>
       </div>
 
-      <h1 className="max-w-xl text-balance text-2xl font-semibold tracking-tight text-[color:var(--fg)] sm:text-[28px]">
-        Ask the institution&rsquo;s memory.
+      <span className="rule-red mx-auto mb-6" aria-hidden />
+
+      <h1 className="display max-w-2xl text-balance text-[34px] text-[color:var(--fg)] sm:text-[46px]">
+        Ask the institution&rsquo;s <em>memory</em>.
       </h1>
       <p className="mt-3 max-w-md text-pretty text-sm leading-relaxed text-[color:var(--fg-2)]">
         Expert knowledge on instrument coverage and regulatory classification —

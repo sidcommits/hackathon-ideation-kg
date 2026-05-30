@@ -127,6 +127,52 @@ def test_v1_chat_completions_non_streaming_returns_json(monkeypatch):
     assert data["choices"][0]["finish_reason"] == "stop"
 
 
+def _drain_global_queue():
+    import api.deps as deps
+    q = deps.ACTIVE_CALLS["hackathon-call-id"].event_queue
+    out = []
+    while not q.empty():
+        out.append(q.get_nowait())
+    return out
+
+
+def test_v1_routes_spoken_to_avatar_and_detail_to_queue(monkeypatch):
+    from api.events import MessageStart, Token, MessageEnd
+
+    async def fake_agent(messages, *, mode="text", **kw):
+        assert mode == "voice"                       # endpoint must request voice
+        yield MessageStart(id="m")
+        yield Token(text="SPOKEN_SUMMARY ", channel="spoken")
+        yield Token(text="DETAIL_BODY", channel="detail")
+        yield MessageEnd(stop_reason="end_turn")
+
+    monkeypatch.setattr(main, "run_agent", fake_agent)
+    _drain_global_queue()                            # isolate from prior tests
+
+    client = TestClient(app)
+    resp = client.post("/v1/chat/completions", json={
+        "messages": [{"role": "user", "content": "Is the note covered?"}],
+        "stream": True,
+    })
+    assert resp.status_code == 200
+    chunks = [json.loads(l[len("data: "):]) for l in resp.text.splitlines()
+              if l.startswith("data: ") and not l.endswith("[DONE]")]
+    body = "".join(c["choices"][0]["delta"].get("content", "") for c in chunks)
+    assert "SPOKEN_SUMMARY" in body                  # avatar speaks the summary
+    assert "DETAIL_BODY" not in body                 # full answer NOT spoken
+
+    drained = _drain_global_queue()
+    types = [e.type for e in drained]
+    assert "user_transcript" in types
+    assert "message_start" in types
+    assert "message_end" in types
+    detail_tokens = [e for e in drained
+                     if e.type == "token" and e.channel == "detail"]
+    assert any("DETAIL_BODY" in e.text for e in detail_tokens)
+    ut = next(e for e in drained if e.type == "user_transcript")
+    assert ut.text == "Is the note covered?"
+
+
 def test_v1_chat_completions_failure_does_not_freeze(monkeypatch):
     """If the agent pipeline raises, the endpoint must still emit a valid OpenAI
     content chunk AND terminate with [DONE] — never a bare {"error"} with no

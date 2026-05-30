@@ -1,8 +1,9 @@
-from fastapi import FastAPI, Path, HTTPException
+from fastapi import FastAPI, Path, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
+import asyncio
 import httpx
 import uuid
 import time
@@ -12,8 +13,9 @@ import os
 from api.agent import make_client, run_agent
 import api.deps as deps
 from api.deps import get_embedder_cached, get_store
-from api.events import ErrorEvent
+from api.events import ErrorEvent, UserTranscript
 from api.prompt import SYSTEM_PROMPT
+from api.reflect_routes import router as reflect_router
 from api.tools import run_tool
 from company_brain.config import get_settings
 
@@ -25,6 +27,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Recursive-improvement loop: /reflect (distill chat→truths) + /learnings/ingest.
+app.include_router(reflect_router)
 
 BEY_API_KEY = os.getenv("Bey") or os.getenv("BEY_API_KEY")
 AVATAR_ID = os.getenv("avatarID") or os.getenv("AVATAR_ID")
@@ -60,6 +65,9 @@ def save_agent_cache(agent_id, external_api_id):
 
 # Auto-load on server startup
 load_agent_cache()
+
+# Strong refs to in-flight background mirror tasks so they aren't GC'd mid-run.
+_BG_TASKS: set[asyncio.Task] = set()
 
 # Register a global static session for free-tier iframe event fanning
 deps.ACTIVE_CALLS["hackathon-call-id"] = deps.ActiveCall(
@@ -411,9 +419,22 @@ async def chat_completions(req: BPCompletionsRequest):
     created = int(time.time())
     _ERR_TEXT = "Sorry, I hit a problem reaching the Company Brain. Please try again."
 
-    async def _run_pipeline():
-        """Drive the agent once; broadcast RAG events to the web SSE queue and
-        yield text for the avatar. Yields the error string on failure."""
+    # Mirror the user's transcribed question into the web chat as a user bubble,
+    # before any assistant events, so the mirrored turn reads top-to-bottom.
+    if active_call and _last:
+        active_call.event_queue.put_nowait(UserTranscript(text=_last))
+
+    # The agent runs in a BACKGROUND task — decoupled from Beyond Presence's HTTP
+    # stream. BP only consumes the spoken summary (via `spoken_q`); the FULL web
+    # mirror (message_start → detail tokens → tool/citation events → message_end)
+    # is broadcast to the web SSE queue by the task itself. So even if BP hears the
+    # summary and drops/times-out its connection before [DONE], the detailed answer
+    # and its sources still finish streaming into the chat in real time.
+    spoken_q: asyncio.Queue = asyncio.Queue()
+    _DONE = object()
+
+    async def _drive():
+        """Drive one voice turn to completion regardless of BP's connection."""
         try:
             client = make_client(settings.anthropic_api_key)
             agen = run_agent(
@@ -425,16 +446,30 @@ async def chat_completions(req: BPCompletionsRequest):
                 max_sensitivity=max_sensitivity,
                 model=settings.extraction_model,
                 system=system_prompt,
+                mode="voice",
             )
             async for event in agen:
-                if event.type in {"tool_call", "tool_result", "citation"}:
+                if event.type == "token":
+                    ch = getattr(event, "channel", "full")
+                    if ch in ("spoken", "both", "full"):
+                        spoken_q.put_nowait(event.text)        # → avatar
+                    if ch in ("detail", "both") and active_call:
+                        active_call.event_queue.put_nowait(event)  # → web chat
+                elif event.type in {
+                    "message_start", "tool_call", "tool_result",
+                    "citation", "message_end",
+                }:
                     if active_call:
-                        active_call.event_queue.put_nowait(event)
-                elif event.type == "token":
-                    yield event.text
+                        active_call.event_queue.put_nowait(event)  # → web chat
         except Exception as exc:
             print(f"[chat_completions] pipeline failed: {exc!r}")
-            yield _ERR_TEXT
+            spoken_q.put_nowait(_ERR_TEXT)
+        finally:
+            spoken_q.put_nowait(_DONE)
+
+    task = asyncio.create_task(_drive())
+    _BG_TASKS.add(task)
+    task.add_done_callback(_BG_TASKS.discard)
 
     def _chunk(delta: dict, finish_reason=None) -> str:
         payload = {
@@ -451,8 +486,11 @@ async def chat_completions(req: BPCompletionsRequest):
     #   role opener → content deltas → finish_reason="stop" → data: [DONE].
     async def event_source():
         yield _chunk({"role": "assistant", "content": ""})
-        async for text in _run_pipeline():
-            yield _chunk({"content": text})
+        while True:
+            item = await spoken_q.get()
+            if item is _DONE:
+                break
+            yield _chunk({"content": item})
         yield _chunk({}, finish_reason="stop")
         yield "data: [DONE]\n\n"
 
@@ -460,9 +498,14 @@ async def chat_completions(req: BPCompletionsRequest):
         return StreamingResponse(event_source(), media_type="text/event-stream")
 
     # ── Non-streaming mode (stream: false) ────────────────────────────────────
-    # BP blocks for one JSON chat.completion object. RAG events are still published
-    # to the web SSE queue inside _run_pipeline before we return.
-    parts = [text async for text in _run_pipeline()]
+    # BP blocks for one JSON chat.completion object. The web mirror is broadcast by
+    # the background task as it runs; here we just collect the spoken summary.
+    parts: list[str] = []
+    while True:
+        item = await spoken_q.get()
+        if item is _DONE:
+            break
+        parts.append(item)
     content = "".join(parts) or _ERR_TEXT
     return JSONResponse({
         "id": completion_id,
@@ -475,4 +518,51 @@ async def chat_completions(req: BPCompletionsRequest):
             "finish_reason": "stop",
         }],
     })
+
+
+# ── Speech-to-text proxy (OpenAI) ────────────────────────────────────────────
+# Browser dictation posts recorded audio here; we forward it to OpenAI's
+# transcription endpoint with the server-held key (so the key never reaches the
+# client). Reuses OPENAI_API_KEY; model defaults to gpt-4o-mini-transcribe.
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+_OPENAI_BASE = os.getenv("OPENAI_BASE_URL", "")
+OPENAI_BASE = _OPENAI_BASE.rstrip("/") if _OPENAI_BASE.startswith("http") else "https://api.openai.com/v1"
+OPENAI_STT_MODEL = os.getenv("OPENAI_STT_MODEL", "gpt-4o-mini-transcribe")
+
+
+def _audio_ext(content_type: str) -> str:
+    ct = (content_type or "").lower()
+    for key in ("webm", "ogg", "mp4", "mpeg", "wav", "m4a", "flac"):
+        if key in ct:
+            return "mp4" if key == "mpeg" else key
+    return "webm"
+
+
+# Audio arrives as the raw request body (the recorded Blob), not multipart — so
+# the server needs no python-multipart dependency. We re-wrap it as multipart for
+# OpenAI via httpx's own encoder.
+@app.post("/api/transcribe")
+async def transcribe(request: Request):
+    if not OPENAI_API_KEY:
+        raise HTTPException(status_code=503, detail="OPENAI_API_KEY is not configured on the server.")
+    data = await request.body()
+    if not data:
+        return {"text": ""}
+    content_type = request.headers.get("content-type") or "audio/webm"
+    file_part = (f"dictation.{_audio_ext(content_type)}", data, content_type)
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                f"{OPENAI_BASE}/audio/transcriptions",
+                headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+                files={"file": file_part},
+                data={"model": OPENAI_STT_MODEL, "response_format": "json"},
+            )
+        if resp.status_code != 200:
+            raise HTTPException(status_code=resp.status_code, detail=f"OpenAI STT failed: {resp.text[:300]}")
+        return {"text": (resp.json().get("text") or "").strip()}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 

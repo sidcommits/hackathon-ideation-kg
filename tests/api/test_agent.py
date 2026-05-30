@@ -219,6 +219,22 @@ async def test_greeting_fast_path_skips_everything(base_kwargs):
 
 
 @pytest.mark.asyncio
+async def test_farewell_fast_path_skips_retrieval_and_ack(base_kwargs):
+    """Goodbyes/thanks answer instantly: no retrieval, and NO 'let me check' filler."""
+    run_tool = _make_tool_runner("ctx")
+    for closer in ("goodbye", "thanks!", "thank you", "that's all"):
+        events = await _collect(run_agent(
+            [{"role": "user", "content": closer}],
+            client=None, run_tool=run_tool, **base_kwargs,
+        ))
+        spoken = "".join(e.text for e in events if isinstance(e, Token)).lower()
+        assert "happy to help" in spoken
+        assert "let me" not in spoken and "company brain" not in spoken
+    assert not run_tool.calls
+
+
+
+@pytest.mark.asyncio
 async def test_citations_deduped_by_chunk_id(base_kwargs):
     client = _FakeClient("Answer.")
     run_tool = _make_tool_runner(
@@ -235,3 +251,149 @@ async def test_citations_deduped_by_chunk_id(base_kwargs):
     ))
     cites = [e for e in events if isinstance(e, Citation)]
     assert len(cites) == 2  # deduped by chunk_id
+
+
+# ── Voice splitter (sync) ────────────────────────────────────────────────────
+def test_voice_splitter_single_chunk():
+    from api.agent import _VoiceSplitter
+    sp = _VoiceSplitter()
+    out = sp.feed("[SPOKEN] Yes, it is covered. [DETAIL] # Answer\nFull body.")
+    out += sp.flush()
+    assert ("spoken", "Yes, it is covered.") in out
+    detail = "".join(t for ch, t in out if ch == "detail")
+    assert "# Answer" in detail and "Full body." in detail
+    assert all(ch != "both" for ch, _ in out)
+
+
+def test_voice_splitter_delimiter_split_across_chunks():
+    from api.agent import _VoiceSplitter
+    sp = _VoiceSplitter()
+    a = sp.feed("[SPOKEN] Short summary. [DE")   # delimiter half-arrived
+    b = sp.feed("TAIL] Detailed answer.")        # completes the delimiter
+    out = a + b + sp.flush()
+    assert a == []                               # nothing emitted while buffering
+    assert ("spoken", "Short summary.") in out
+    assert ("detail", "Detailed answer.") in out
+
+
+def test_voice_splitter_streams_detail_after_switch():
+    from api.agent import _VoiceSplitter
+    sp = _VoiceSplitter()
+    sp.feed("[SPOKEN] s. [DETAIL] one ")
+    more = sp.feed("two three")
+    assert more == [("detail", "two three")]
+
+
+def test_voice_splitter_malformed_no_detail_is_both():
+    from api.agent import _VoiceSplitter
+    sp = _VoiceSplitter()
+    assert sp.feed("[SPOKEN] Only a summary, model forgot the marker.") == []
+    assert sp.flush() == [("both", "Only a summary, model forgot the marker.")]
+
+
+def test_voice_splitter_tolerates_markdown_and_case_on_tags():
+    from api.agent import _VoiceSplitter
+    sp = _VoiceSplitter()
+    out = sp.feed("**[Spoken]** Yes it is covered. **[Detail]**\n# Answer\nFull body.")
+    out += sp.flush()
+    assert ("spoken", "Yes it is covered.") in out
+    detail = "".join(t for ch, t in out if ch == "detail")
+    assert "# Answer" in detail and "Full body." in detail
+
+
+def test_voice_splitter_does_not_split_on_the_word_detail_in_prose():
+    from api.agent import _VoiceSplitter
+    sp = _VoiceSplitter()
+    # "detail" appears as a plain word in the spoken summary; only the bracketed
+    # [DETAIL] tag should split.
+    out = sp.feed("Here is more detail on that. [DETAIL] The full answer.")
+    out += sp.flush()
+    spoken = "".join(t for ch, t in out if ch == "spoken")
+    detail = "".join(t for ch, t in out if ch == "detail")
+    assert "more detail on that" in spoken
+    assert detail == "The full answer."
+
+
+# ── run_agent voice mode (async) ─────────────────────────────────────────────
+@pytest.mark.asyncio
+async def test_voice_mode_splits_spoken_and_detail(base_kwargs):
+    client = _FakeClient(
+        "[SPOKEN] Yes, that note is reportable and complex. "
+        "[DETAIL] # Coverage\nThe instrument is **MiFIR-reportable**."
+    )
+    run_tool = _make_tool_runner("ctx")
+    events = await _collect(run_agent(
+        [{"role": "user", "content": "Is the note covered?"}],
+        client=client, run_tool=run_tool, mode="voice", **base_kwargs,
+    ))
+    spoken = "".join(e.text for e in events
+                     if isinstance(e, Token) and e.channel in ("spoken", "both"))
+    detail = "".join(e.text for e in events
+                     if isinstance(e, Token) and e.channel == "detail")
+    assert "Yes, that note is reportable and complex." in spoken
+    assert "MiFIR-reportable" in detail
+    assert "MiFIR-reportable" not in spoken          # full answer not spoken
+    assert "Coverage" not in spoken
+
+
+@pytest.mark.asyncio
+async def test_voice_mode_injects_output_format(base_kwargs):
+    client = _FakeClient("[SPOKEN] s. [DETAIL] d.")
+    run_tool = _make_tool_runner("ctx")
+    await _collect(run_agent(
+        [{"role": "user", "content": "q"}],
+        client=client, run_tool=run_tool, mode="voice", **base_kwargs,
+    ))
+    sys_arg = client.messages.stream_calls[0]["system"]
+    assert "[SPOKEN]" in sys_arg and "[DETAIL]" in sys_arg
+
+
+@pytest.mark.asyncio
+async def test_voice_mode_ack_is_spoken_channel(base_kwargs):
+    client = _FakeClient("[SPOKEN] s. [DETAIL] d.")
+    run_tool = _make_tool_runner("ctx")
+    events = await _collect(run_agent(
+        [{"role": "user", "content": "q"}],
+        client=client, run_tool=run_tool, mode="voice", **base_kwargs,
+    ))
+    first_token = next(e for e in events if isinstance(e, Token))
+    assert first_token.channel == "spoken"           # ack reaches avatar, not chat
+
+
+@pytest.mark.asyncio
+async def test_voice_mode_malformed_synthesis_is_both(base_kwargs):
+    client = _FakeClient("Just a summary, no detail marker at all.")
+    run_tool = _make_tool_runner("ctx")
+    events = await _collect(run_agent(
+        [{"role": "user", "content": "q"}],
+        client=client, run_tool=run_tool, mode="voice", **base_kwargs,
+    ))
+    both = "".join(e.text for e in events
+                   if isinstance(e, Token) and e.channel == "both")
+    assert "Just a summary, no detail marker at all." in both
+
+
+@pytest.mark.asyncio
+async def test_voice_mode_greeting_is_both(base_kwargs):
+    run_tool = _make_tool_runner("ctx")
+    events = await _collect(run_agent(
+        [{"role": "user", "content": "hello"}],
+        client=None, run_tool=run_tool, mode="voice", **base_kwargs,
+    ))
+    greet_tokens = [e for e in events if isinstance(e, Token)]
+    assert greet_tokens and all(e.channel == "both" for e in greet_tokens)
+    assert "SIX Corporate Advisor" in "".join(e.text for e in greet_tokens)
+
+
+@pytest.mark.asyncio
+async def test_text_mode_unchanged_uses_full_channel(base_kwargs):
+    client = _FakeClient("Plain text answer.")
+    run_tool = _make_tool_runner("ctx")
+    events = await _collect(run_agent(
+        [{"role": "user", "content": "q"}],
+        client=client, run_tool=run_tool, **base_kwargs,   # default mode="text"
+    ))
+    assert all(e.channel == "full" for e in events if isinstance(e, Token))
+    sys_arg = client.messages.stream_calls[0]["system"]
+    assert "[SPOKEN]" not in sys_arg
+    assert "Plain text answer." in "".join(e.text for e in events if isinstance(e, Token))

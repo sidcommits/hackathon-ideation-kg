@@ -8,6 +8,10 @@ export type Message = {
   text: string;
   citations?: Citation[];
   subgraph?: MessageSubgraph;
+  // Tool trace for THIS turn, attached to the message so it renders with its
+  // answer regardless of the ephemeral activeToolCalls list or isLast gating
+  // (the voice mirror arrives async via SSE and can race that global list).
+  toolCalls?: ToolCard[];
 };
 export type ToolCard = {
   id: string; name: string; args: Record<string, unknown>;
@@ -63,14 +67,24 @@ export function reduce(state: ChatState, event: ChatEvent): ChatState {
       return { ...state, messages: [...messages.slice(0, idx), updated] };
     }
 
-    case "tool_call":
+    case "tool_call": {
+      // Tool ids are stable within a turn but can repeat across turns (the agent
+      // uses a constant id for search_knowledge). Upsert by id so a re-delivered
+      // or reordered tool_call never produces two cards with the same React key.
+      if (state.activeToolCalls.some((c) => c.id === event.id)) return state;
+      const card: ToolCard = {
+        id: event.id, name: event.name, args: event.args, status: "running",
+      };
+      const messages = ensureAssistant(state.messages);
+      const idx = messages.length - 1;
+      const cur = messages[idx];
+      const updated: Message = { ...cur, toolCalls: [...(cur.toolCalls ?? []), card] };
       return {
         ...state,
-        activeToolCalls: [
-          ...state.activeToolCalls,
-          { id: event.id, name: event.name, args: event.args, status: "running" },
-        ],
+        activeToolCalls: [...state.activeToolCalls, card],
+        messages: [...messages.slice(0, idx), updated],
       };
+    }
 
     case "tool_result": {
       const activeToolCalls = state.activeToolCalls.map((c) =>
@@ -100,6 +114,9 @@ export function reduce(state: ChatState, event: ChatEvent): ChatState {
       const updatedMsg: Message = {
         ...cur,
         subgraph: { nodes: [...subNodeById.values()], edges: [...subEdgeSet.values()] },
+        toolCalls: (cur.toolCalls ?? []).map((c) =>
+          c.id === event.id ? { ...c, status: "done" as const, summary: event.summary } : c,
+        ),
       };
 
       return {
@@ -127,6 +144,14 @@ export function reduce(state: ChatState, event: ChatEvent): ChatState {
       };
       return { ...state, messages: [...messages.slice(0, idx), updated] };
     }
+
+    case "user_transcript":
+      return {
+        ...state,
+        messages: [...state.messages, { role: "user", text: event.text }],
+        activeToolCalls: [],
+        graph: { ...state.graph, pulsedIds: [] },
+      };
 
     case "error": {
       const messages = ensureAssistant(state.messages);

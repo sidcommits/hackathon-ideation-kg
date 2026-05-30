@@ -5,10 +5,10 @@ import { DummyConnectors } from "@/components/DummyConnectors"; // DEMO-ONLY (re
 
 export function ChatThread({
   state,
-  onOpenSources,
+  onSelectSource,
 }: {
   state: ChatState;
-  onOpenSources?: (m: Message) => void;
+  onSelectSource?: (m: Message, docTitle: string) => void;
 }) {
   const lastIdx = state.messages.length - 1;
 
@@ -34,22 +34,24 @@ export function ChatThread({
               )}
             </div>
 
-            {/* Tool calls render under the active assistant turn,
-                above the prose, like a reasoning trace. */}
-            {m.role === "assistant" && isLast && state.activeToolCalls.length > 0 && (
+            {/* Tool calls render under their own assistant turn, above the prose,
+                like a reasoning trace. Attached to the message (not the ephemeral
+                activeToolCalls list) so the async voice mirror renders them
+                reliably and each answer keeps its own trace. */}
+            {m.role === "assistant" && m.toolCalls && m.toolCalls.length > 0 && (
               <div className="flex flex-col gap-1.5">
-                {state.activeToolCalls.map((c) => (
+                {m.toolCalls.map((c) => (
                   <ToolCallCard key={c.id} card={c} />
                 ))}
-                {/* DEMO-ONLY: mock future connectors. Remove this line to reverse. */}
-                <DummyConnectors />
+                {/* DEMO-ONLY: mock future connectors (last turn only). Remove to reverse. */}
+                {isLast && <DummyConnectors />}
               </div>
             )}
 
             <MessageBubble
               m={m}
               streaming={m.role === "assistant" && isLast}
-              onOpenSources={onOpenSources}
+              onSelectSource={onSelectSource}
             />
           </div>
         );

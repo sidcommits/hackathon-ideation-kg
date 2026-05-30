@@ -10,10 +10,11 @@ export type TreeNode = {
     sensitivity?: string;
     passageCount?: number;
     path?: string[]; // root → … → document label
+    url?: string; // hosted-file deep link (dummy), for the document leaf
   };
 };
 
-type ProvenanceMap = Record<string, { chain: string[] }>;
+export type ProvenanceMap = Record<string, { chain: string[]; url?: string }>;
 
 /** Root-first origin chain for a document title, or the __default__ fallback. */
 export function resolveChain(docTitle: string, prov: ProvenanceMap): string[] {
@@ -55,6 +56,7 @@ export function buildSourceTree(citations: Citation[], prov: ProvenanceMap): Tre
         sensitivity: info.sensitivity,
         passageCount: info.passages.length,
         path: [...chain, docTitle],
+        url: prov[docTitle]?.url,
       },
     };
     level.push(docNode);

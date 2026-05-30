@@ -1,25 +1,53 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Message } from "@/lib/chatReducer";
 import { buildSourceTree, type TreeNode } from "@/lib/sourceTree";
+import { platformFor, type Platform } from "@/lib/platforms";
 import provenance from "@/lib/provenance.json";
 
-/* Semantic palette — mirrors GraphCanvas / globals.css. */
-const COLOR: Record<string, string> = {
-  Regulation: "#34D399",
-  DataAttribute: "#34D399",
-  InstrumentType: "#34D399",
-  Obligation: "#60A5FA",
-  Concept: "#60A5FA",
-  Insight: "#60A5FA",
-  Document: "#C084FC",
-  Chunk: "#C084FC",
-};
+/* Official brand glyph for a source platform (root rows). */
+function PlatformLogo({ platform }: { platform: Platform }) {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+      className="shrink-0"
+      style={{ color: platform.color }}
+    >
+      <path d={platform.path} />
+    </svg>
+  );
+}
 
-function splitId(id: string): { label: string; name: string } {
-  const i = id.indexOf(":");
-  if (i === -1) return { label: "", name: id };
-  return { label: id.slice(0, i), name: id.slice(i + 1) };
+function ExternalLinkIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    </svg>
+  );
+}
+
+/* "Open in new tab" link for a tree row — root/group/document. Sibling of the
+   row's expand button (not nested), so clicking it never toggles the row.
+   Documents link to their hosted file; roots/groups to the platform. */
+function OpenLink({ href, platform, label }: { href: string; platform: Platform; label: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      title={`Open ${label} in ${platform.label} — new tab`}
+      aria-label={`Open ${label} in ${platform.label} in a new tab`}
+      className="shrink-0 inline-flex items-center gap-1 rounded-md border border-[color:var(--line)] px-1.5 py-1 text-[color:var(--fg-3)] transition-colors hover:border-[color:var(--accent-dim)] hover:text-[color:var(--accent)] cursor-pointer"
+    >
+      <ExternalLinkIcon />
+      <span className="hidden font-mono text-[length:var(--text-2xs)] uppercase tracking-wider sm:inline">Open</span>
+    </a>
+  );
 }
 
 function Chevron({ open }: { open: boolean }) {
@@ -88,22 +116,82 @@ function NodeGlyph({ kind, label }: { kind: TreeNode["kind"]; label: string }) {
   );
 }
 
+/* Walk the tree reproducing renderNode's key scheme to find a document by title,
+   returning the keys to expand (ancestors + the doc itself) and its path-to-root. */
+function locateDoc(
+  roots: TreeNode[],
+  docTitle: string,
+): { openKeys: string[]; docKey: string; path: string[] } | null {
+  let found: { openKeys: string[]; docKey: string; path: string[] } | null = null;
+  const walk = (node: TreeNode, keyPrefix: string, idx: number, ancestors: string[]): boolean => {
+    const key = `${keyPrefix}/${idx}-${node.label}`;
+    if (node.kind === "document" && node.label === docTitle) {
+      found = { openKeys: [...ancestors, key], docKey: key, path: node.meta?.path ?? [] };
+      return true;
+    }
+    for (let i = 0; i < node.children.length; i++) {
+      if (walk(node.children[i], key, i, [...ancestors, key])) return true;
+    }
+    return false;
+  };
+  for (let i = 0; i < roots.length; i++) {
+    if (walk(roots[i], "root", i, [])) break;
+  }
+  return found;
+}
+
 /* ── Sources tier: provenance tree (root → group → document → passages) ── */
-function SourcesTree({ message }: { message: Message }) {
+function SourcesTree({
+  message,
+  focusDoc,
+  focusNonce,
+}: {
+  message: Message;
+  focusDoc?: string | null;
+  focusNonce?: number;
+}) {
   const tree = useMemo(
     () => buildSourceTree(message.citations ?? [], provenance as Record<string, { chain: string[] }>),
     [message.citations],
   );
 
-  // Expanded node labels (path-joined keys) and the selected document's path.
+  // Expanded node keys, the selected document's path, and a transiently-pulsing row.
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [selectedPath, setSelectedPath] = useState<string[] | null>(null);
+  const [pulseKey, setPulseKey] = useState<string | null>(null);
+  // The node row currently hovered. Its "Open" button — and those of its
+  // descendants — are revealed; ancestors' stay hidden. Keyed by the same
+  // `${keyPrefix}/${idx}-label` scheme renderNode uses, so a descendant's key
+  // is `hoveredKey + "/" + …`.
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  const rowRefs = useRef<Map<string, HTMLElement>>(new Map());
 
   // Reset selection + expansion when switching to a different answer's tree.
   useEffect(() => {
     setOpen(new Set());
     setSelectedPath(null);
   }, [message]);
+
+  // A citation was clicked in the chat → expand the path to that document,
+  // select it, and queue it for scroll + highlight. focusNonce re-triggers when
+  // the same document is clicked again.
+  useEffect(() => {
+    if (!focusDoc) return;
+    const hit = locateDoc(tree, focusDoc);
+    if (!hit) return;
+    setOpen((s) => new Set([...s, ...hit.openKeys]));
+    setSelectedPath(hit.path);
+    setPulseKey(hit.docKey);
+  }, [focusDoc, focusNonce, tree]);
+
+  // Scroll the focused row into view once it has mounted (post-expansion), then
+  // let the highlight fade.
+  useEffect(() => {
+    if (!pulseKey) return;
+    rowRefs.current.get(pulseKey)?.scrollIntoView({ block: "center", behavior: "smooth" });
+    const t = setTimeout(() => setPulseKey(null), 1400);
+    return () => clearTimeout(t);
+  }, [pulseKey]);
 
   const toggle = (key: string) =>
     setOpen((s) => {
@@ -118,7 +206,7 @@ function SourcesTree({ message }: { message: Message }) {
 
   const ROW_PAD = [0, 14, 28, 42];
 
-  const renderNode = (node: TreeNode, depth: number, keyPrefix: string, idx = 0) => {
+  const renderNode = (node: TreeNode, depth: number, keyPrefix: string, idx: number, rootLabel: string) => {
     const key = `${keyPrefix}/${idx}-${node.label}`;
     const isOpen = open.has(key);
     const hasChildren = node.children.length > 0;
@@ -136,41 +224,82 @@ function SourcesTree({ message }: { message: Message }) {
       );
     }
 
+    const isRoot = node.kind === "root";
     const isDoc = node.kind === "document";
     const isSelected = isDoc && selectedPath && node.meta?.path?.join("/") === selectedPath.join("/");
+    // Root rows ARE a platform; group/document rows belong to their root platform.
+    const platform = platformFor(isRoot ? node.label : rootLabel);
+    // Reveal this node's "Open" button when it — or any ancestor — is hovered.
+    // Its key equals hoveredKey (self) or starts with `hoveredKey + "/"` (descendant);
+    // an ancestor's key is shorter, so it never matches → parents stay hidden.
+    const openVisible =
+      hoveredKey != null && (key === hoveredKey || key.startsWith(hoveredKey + "/"));
 
     return (
       <div key={key}>
-        <button
-          type="button"
-          onClick={() => {
-            if (hasChildren) toggle(key);
-            if (isDoc) setSelectedPath(node.meta?.path ?? null);
+        {/* Row: expand/select button, then an "open in new tab" link right beside
+            the name (an <a> inside a <button> would be invalid, so it's a sibling),
+            then the badges pinned to the right edge. */}
+        <div
+          ref={(el) => {
+            if (el) rowRefs.current.set(key, el);
+            else rowRefs.current.delete(key);
           }}
+          onMouseEnter={() => setHoveredKey(key)}
           style={{ paddingLeft: pad + 8 }}
-          className={`flex w-full items-center gap-2 py-1.5 pr-2.5 text-left transition-colors hover:bg-[color:var(--bg-3)]/40 cursor-pointer ${
+          className={`flex items-center gap-1.5 rounded-lg pr-1.5 transition-colors hover:bg-[color:var(--bg-3)]/40 ${
             isSelected ? "bg-[color:var(--bg-3)]/60" : ""
-          }`}
+          } ${pulseKey === key ? "source-focus-pulse" : ""}`}
         >
-          <span className="w-3 shrink-0 text-[color:var(--fg-3)]">
-            {hasChildren ? <Chevron open={isOpen} /> : null}
-          </span>
-          <NodeGlyph kind={node.kind} label={node.label} />
+          <button
+            type="button"
+            onClick={() => {
+              if (hasChildren) toggle(key);
+              if (isDoc) setSelectedPath(node.meta?.path ?? null);
+            }}
+            className="flex min-w-0 items-center gap-2 py-1.5 text-left cursor-pointer"
+          >
+            <span className="w-3 shrink-0 text-[color:var(--fg-3)]">
+              {hasChildren ? <Chevron open={isOpen} /> : null}
+            </span>
+            {isRoot ? <PlatformLogo platform={platform} /> : <NodeGlyph kind={node.kind} label={node.label} />}
+            <span
+              className={`min-w-0 truncate ${
+                isDoc
+                  ? "font-mono text-[length:var(--text-sm)] text-[color:var(--fg-2)]"
+                  : `text-[length:var(--text-sm)] text-[color:var(--fg)] ${isRoot ? "font-semibold" : "font-medium"}`
+              }`}
+            >
+              {node.label}
+            </span>
+          </button>
+
+          {/* Open-in-new-tab — next to the name, hover-revealed (this node + descendants). */}
           <span
-            className={`min-w-0 flex-1 truncate ${
-              isDoc ? "font-mono text-[length:var(--text-sm)] text-[color:var(--fg-2)]" : "text-[length:var(--text-sm)] font-medium text-[color:var(--fg)]"
+            className={`shrink-0 transition-opacity duration-100 ${
+              openVisible ? "opacity-100" : "opacity-0 pointer-events-none"
             }`}
           >
-            {node.label}
+            <OpenLink
+              href={(isDoc && node.meta?.url) ? node.meta.url : platform.url}
+              platform={platform}
+              label={node.label}
+            />
           </span>
+
+          {/* Badges pinned to the right edge. */}
           {isDoc && (
-            <span className="shrink-0 rounded-full bg-[color:var(--bg-3)] px-1.5 py-0.5 font-mono text-[length:var(--text-2xs)] text-[color:var(--fg-3)]">
-              {node.meta?.passageCount}
+            <span className="ml-auto flex shrink-0 items-center gap-1.5">
+              <span className="rounded-full bg-[color:var(--bg-3)] px-1.5 py-0.5 font-mono text-[length:var(--text-2xs)] text-[color:var(--fg-3)]">
+                {node.meta?.passageCount}
+              </span>
+              {node.meta?.sensitivity && <SensitivityDot sensitivity={node.meta.sensitivity} />}
             </span>
           )}
-          {isDoc && node.meta?.sensitivity && <SensitivityDot sensitivity={node.meta.sensitivity} />}
-        </button>
-        {isOpen && hasChildren && <div>{node.children.map((c, i) => renderNode(c, depth + 1, key, i))}</div>}
+        </div>
+        {isOpen && hasChildren && (
+          <div>{node.children.map((c, i) => renderNode(c, depth + 1, key, i, rootLabel))}</div>
+        )}
       </div>
     );
   };
@@ -200,101 +329,82 @@ function SourcesTree({ message }: { message: Message }) {
       </div>
 
       {/* Nested tree */}
-      <div className="flex flex-col">
-        {tree.map((root, i) => renderNode(root, 0, "root", i))}
+      <div className="flex flex-col" onMouseLeave={() => setHoveredKey(null)}>
+        {tree.map((root, i) => renderNode(root, 0, "root", i, root.label))}
       </div>
     </div>
   );
 }
 
-/* ── Relations tier: subject node → outgoing edges ── */
-function RelationsTree({ message }: { message: Message }) {
-  const groups = useMemo(() => {
-    const sub = message.subgraph;
-    if (!sub) return [];
-    const m = new Map<string, { label: string; name: string; rels: { rel: string; to: string }[] }>();
-    for (const e of sub.edges) {
-      const from = splitId(e.from);
-      if (!m.has(e.from)) m.set(e.from, { label: from.label, name: from.name, rels: [] });
-      m.get(e.from)!.rels.push({ rel: e.rel, to: e.to });
-    }
-    // Most-connected subjects first.
-    return [...m.entries()].sort((a, b) => b[1].rels.length - a[1].rels.length);
-  }, [message.subgraph]);
-
-  const [open, setOpen] = useState<Set<string>>(new Set());
-  const toggle = (k: string) =>
-    setOpen((s) => {
-      const n = new Set(s);
-      n.has(k) ? n.delete(k) : n.add(k);
-      return n;
-    });
-
-  if (groups.length === 0) {
-    return <p className="px-1 py-2 text-[length:var(--text-sm)] text-[color:var(--fg-3)]">No relations traversed.</p>;
-  }
-
+/* Sources content, shared by the slide-over (mobile) and the docked column (desktop). */
+function SourcesBody({
+  message,
+  focusDoc,
+  focusNonce,
+}: {
+  message: Message | null;
+  focusDoc?: string | null;
+  focusNonce?: number;
+}) {
   return (
-    <div className="flex flex-col gap-1">
-      {groups.map(([id, g]) => {
-        const isOpen = open.has(id);
-        const color = COLOR[g.label] ?? "#94A3B8";
-        return (
-          <div key={id} className="rounded-lg border border-[color:var(--line)] bg-[color:var(--bg-2)]/50">
-            <button
-              type="button"
-              onClick={() => toggle(id)}
-              className="flex w-full items-center gap-2 px-2.5 py-2 text-left transition-colors hover:bg-[color:var(--bg-3)]/40 cursor-pointer"
-            >
-              <span className="text-[color:var(--fg-3)]">
-                <Chevron open={isOpen} />
-              </span>
-              <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: color, boxShadow: `0 0 6px ${color}66` }} />
-              <span className="min-w-0 flex-1 truncate text-[length:var(--text-sm)] font-medium text-[color:var(--fg)]">
-                {g.name}
-              </span>
-              <span className="shrink-0 rounded-full bg-[color:var(--bg-3)] px-1.5 py-0.5 font-mono text-[length:var(--text-2xs)] text-[color:var(--fg-3)]">
-                {g.rels.length}
-              </span>
-            </button>
-            {isOpen && (
-              <div className="flex flex-col gap-1.5 border-t border-[color:var(--line)] px-2.5 py-2 pl-7">
-                {g.rels.map((r, i) => {
-                  const to = splitId(r.to);
-                  const toColor = COLOR[to.label] ?? "#94A3B8";
-                  return (
-                    <div key={i} className="flex items-center gap-2 text-[length:var(--text-sm)]">
-                      <span className="shrink-0 rounded border border-[color:var(--line)] bg-[color:var(--bg-2)] px-1.5 py-0.5 font-mono text-[length:var(--text-2xs)] uppercase tracking-wider text-[color:var(--fg-3)]">
-                        {r.rel}
-                      </span>
-                      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: toColor }} />
-                      <span className="min-w-0 truncate font-medium text-[color:var(--fg-2)]">{to.name}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })}
+    <div className="flex-1 overflow-y-auto px-3 py-3">
+      {!message ? (
+        <p className="px-1 py-2 text-[length:var(--text-sm)] text-[color:var(--fg-3)]">
+          Ask a question — the source documents and passages behind its answer will appear here.
+        </p>
+      ) : (
+        <SourcesTree message={message} focusDoc={focusDoc} focusNonce={focusNonce} />
+      )}
     </div>
   );
 }
 
+/* Docked Sources column — replaces the knowledge-graph panel on large screens.
+   Always visible; follows the latest answer (or a clicked citation).
+   GraphCanvas code is retained, just no longer rendered here. */
+export function DockedSourcesPanel({
+  message,
+  focusDoc,
+  focusNonce,
+}: {
+  message: Message | null;
+  focusDoc?: string | null;
+  focusNonce?: number;
+}) {
+  const preview = message?.text?.replace(/[#*`>]/g, "").trim().slice(0, 90);
+  return (
+    <div className="flex h-full flex-col bg-[color:var(--bg-2)]">
+      <header className="border-b border-[color:var(--line)] bg-[color:var(--bg-3)]/40 px-4 py-[14px]">
+        <div className="font-mono text-[length:var(--text-xs)] uppercase tracking-[0.18em] text-[color:var(--fg-2)]">
+          Sources
+        </div>
+        <div className="mt-0.5 truncate text-[length:var(--text-sm)] text-[color:var(--fg-2)]">
+          {preview ? `${preview}…` : "Traceable provenance for every answer"}
+        </div>
+      </header>
+      <SourcesBody message={message} focusDoc={focusDoc} focusNonce={focusNonce} />
+    </div>
+  );
+}
+
+/* Slide-over panel — for narrow screens, where the docked column is hidden. */
 export function SourcesPanel({
   message,
   open,
   onClose,
+  focusDoc,
+  focusNonce,
 }: {
   message: Message | null;
   open: boolean;
   onClose: () => void;
+  focusDoc?: string | null;
+  focusNonce?: number;
 }) {
-  const [tab, setTab] = useState<"sources" | "relations">("sources");
   const preview = message?.text?.replace(/[#*`>]/g, "").trim().slice(0, 90);
 
   return (
-    <>
+    <div className="lg:hidden">
       {/* Backdrop */}
       <div
         onClick={onClose}
@@ -314,7 +424,7 @@ export function SourcesPanel({
         <header className="flex items-center justify-between border-b border-[color:var(--line)] px-4 py-3">
           <div className="min-w-0">
             <div className="font-mono text-[length:var(--text-xs)] uppercase tracking-[0.18em] text-[color:var(--fg-3)]">
-              Sources &amp; Relations
+              Sources
             </div>
             {preview && (
               <div className="mt-0.5 truncate text-[length:var(--text-sm)] text-[color:var(--fg-2)]">{preview}…</div>
@@ -332,36 +442,8 @@ export function SourcesPanel({
           </button>
         </header>
 
-        {/* Tabs */}
-        <div className="flex gap-1 border-b border-[color:var(--line)] px-3 py-2">
-          {(["sources", "relations"] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
-              className={`rounded-lg px-3 py-1.5 text-[length:var(--text-sm)] font-medium capitalize transition-colors cursor-pointer ${
-                tab === t
-                  ? "bg-[color:var(--bg-3)] text-[color:var(--fg)]"
-                  : "text-[color:var(--fg-3)] hover:text-[color:var(--fg-2)]"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-3 py-3">
-          {!message ? (
-            <p className="px-1 py-2 text-[length:var(--text-sm)] text-[color:var(--fg-3)]">
-              Ask a question — its sources and the relations it traversed will appear here.
-            </p>
-          ) : tab === "sources" ? (
-            <SourcesTree message={message} />
-          ) : (
-            <RelationsTree message={message} />
-          )}
-        </div>
+        <SourcesBody message={message} focusDoc={focusDoc} focusNonce={focusNonce} />
       </aside>
-    </>
+    </div>
   );
 }

@@ -11,6 +11,7 @@ class MessageStart(BaseModel):
 class Token(BaseModel):
     type: Literal["token"] = "token"
     text: str
+    channel: Literal["full", "spoken", "detail", "both"] = "full"
 
 
 class ToolCall(BaseModel):
@@ -44,12 +45,20 @@ class MessageEnd(BaseModel):
     stop_reason: str
 
 
+class UserTranscript(BaseModel):
+    type: Literal["user_transcript"] = "user_transcript"
+    text: str
+
+
 class ErrorEvent(BaseModel):
     type: Literal["error"] = "error"
     message: str
 
 
-Event = Union[MessageStart, Token, ToolCall, ToolResult, Citation, MessageEnd, ErrorEvent]
+Event = Union[
+    MessageStart, Token, ToolCall, ToolResult, Citation, MessageEnd,
+    UserTranscript, ErrorEvent,
+]
 
 
 def sse(event: BaseModel) -> str:

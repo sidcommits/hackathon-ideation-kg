@@ -1,15 +1,21 @@
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { Message } from "@/lib/chatReducer";
 import { CitationChip } from "@/components/CitationChip";
+import provenance from "@/lib/provenance.json";
+
+// Hosted-file deep link for a cited document (dummy platform URL), if known.
+const fileUrl = (docTitle: string): string | undefined =>
+  (provenance as Record<string, { url?: string }>)[docTitle]?.url;
 
 export function MessageBubble({
   m,
   streaming = false,
-  onOpenSources,
+  onSelectSource,
 }: {
   m: Message;
   streaming?: boolean;
-  onOpenSources?: (m: Message) => void;
+  onSelectSource?: (m: Message, docTitle: string) => void;
 }) {
   const isUser = m.role === "user";
   const isEmpty = m.text.length === 0;
@@ -32,7 +38,7 @@ export function MessageBubble({
             ) : (
               <>
                 <span className="contents">
-                  <ReactMarkdown>{m.text}</ReactMarkdown>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
                 </span>
                 {streaming && <span className="stream-caret" aria-hidden />}
               </>
@@ -42,27 +48,17 @@ export function MessageBubble({
 
         {m.citations && m.citations.length > 0 && (
           <div className="mt-3 flex flex-col gap-2 border-t border-[color:var(--line)] pt-3">
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-mono text-[length:var(--text-2xs)] uppercase tracking-[0.18em] text-[color:var(--fg-3)]">
-                Sources
-              </span>
-              {onOpenSources && (
-                <button
-                  type="button"
-                  onClick={() => onOpenSources(m)}
-                  className="flex items-center gap-1 rounded-md border border-[color:var(--line)] px-1.5 py-0.5 font-mono text-[length:var(--text-2xs)] uppercase tracking-wider text-[color:var(--fg-3)] transition-colors hover:border-[color:var(--accent-dim)] hover:text-[color:var(--accent)] cursor-pointer"
-                  title="View sources & relations as a tree"
-                >
-                  Tree view
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <path d="M9 6l6 6-6 6" />
-                  </svg>
-                </button>
-              )}
-            </div>
+            <span className="font-mono text-[length:var(--text-2xs)] uppercase tracking-[0.18em] text-[color:var(--fg-3)]">
+              Sources
+            </span>
             <div className="flex flex-wrap gap-1.5">
               {m.citations.map((c, i) => (
-                <CitationChip key={i} c={c} />
+                <CitationChip
+                  key={i}
+                  c={c}
+                  onSelect={onSelectSource ? () => onSelectSource(m, c.doc_title) : undefined}
+                  href={fileUrl(c.doc_title)}
+                />
               ))}
             </div>
           </div>

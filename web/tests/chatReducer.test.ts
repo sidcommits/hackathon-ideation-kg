@@ -30,6 +30,29 @@ describe("chatReducer", () => {
     expect(card.summary).toBe("5 chunks");
   });
 
+  it("does not create duplicate tool cards when a tool_call id repeats", () => {
+    const s = feed([
+      { type: "message_start", id: "m1" },
+      { type: "tool_call", id: "call_search_knowledge", name: "search_knowledge", args: { query: "a" } },
+      { type: "tool_call", id: "call_search_knowledge", name: "search_knowledge", args: { query: "a" } },
+    ]);
+    expect(s.activeToolCalls.filter((c) => c.id === "call_search_knowledge")).toHaveLength(1);
+  });
+
+  it("attaches tool calls to the assistant message and resolves them on tool_result", () => {
+    const s = feed([
+      { type: "message_start", id: "m1" },
+      { type: "tool_call", id: "call_search_knowledge", name: "search_knowledge", args: { query: "x" } },
+      { type: "tool_result", id: "call_search_knowledge", summary: "5 chunks",
+        graph_delta: { nodes: [], edges: [] } },
+    ]);
+    const last = s.messages[s.messages.length - 1];
+    expect(last.role).toBe("assistant");
+    expect(last.toolCalls).toHaveLength(1);
+    expect(last.toolCalls![0].status).toBe("done");
+    expect(last.toolCalls![0].summary).toBe("5 chunks");
+  });
+
   it("merges graph deltas and flags newly-arrived nodes as pulsed", () => {
     const s = feed([
       { type: "tool_result", id: "tc1", summary: "",
@@ -69,6 +92,33 @@ describe("chatReducer", () => {
     expect(s.graph.pulsedIds).toHaveLength(0);
     // the accumulated graph node is retained across turns
     expect(s.graph.nodes.map((n) => n.id)).toContain("Reg:MiFID II");
+  });
+
+  it("appends a user bubble on user_transcript and clears tool cards/pulses", () => {
+    let s = feed([
+      { type: "message_start", id: "m1" },
+      { type: "tool_call", id: "tc1", name: "search_knowledge", args: {} },
+    ]);
+    s = reduce(s, { type: "user_transcript", text: "Is the note covered?" });
+    const last = s.messages[s.messages.length - 1];
+    expect(last.role).toBe("user");
+    expect(last.text).toBe("Is the note covered?");
+    expect(s.activeToolCalls).toHaveLength(0);
+    expect(s.graph.pulsedIds).toHaveLength(0);
+  });
+
+  it("renders a mirrored voice turn: user_transcript then detail tokens", () => {
+    const s = feed([
+      { type: "user_transcript", text: "What is SFDR?" },
+      { type: "message_start", id: "m2" },
+      { type: "token", text: "SFDR ", channel: "detail" },
+      { type: "token", text: "is a disclosure regulation.", channel: "detail" },
+      { type: "message_end", stop_reason: "end_turn" },
+    ]);
+    expect(s.messages[0]).toMatchObject({ role: "user", text: "What is SFDR?" });
+    const assistant = s.messages[1];
+    expect(assistant.role).toBe("assistant");
+    expect(assistant.text).toBe("SFDR is a disclosure regulation.");
   });
 
   it("renders an error event into the assistant message", () => {
