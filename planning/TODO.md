@@ -32,6 +32,27 @@ Deferred work items, most recent first.
 
 ---
 
+## Ingestion status visualization (in-product)
+**Status:** 💡 IDEA (captured 2026-05-30) — implement later.
+**Why:** Ingest progress is currently only visible via CLI logs + manual `pgrep` + ad-hoc Cypher counts. Surface it *in the product* so progress is visible and demo-able without the terminal (and so a long ingest isn't a black box).
+
+**What we check by hand today (= exactly what to productize):**
+- whether an ingest is running (process check)
+- extracted / total chunks (the progress-bar metric)
+- per-label node counts (Document / Chunk / Regulation / DataAttribute / InstrumentType / Obligation / Concept / Insight) + total edges
+- the final `DONE: {summary}` line / a last-run timestamp
+
+**MVP:**
+- Backend `GET /ingest/status` → JSON `{running, documents, chunks, extracted, total, by_label:{...}, edges, last_run_ts}`. Counts via the same Cypher we run manually; `running` via a lightweight flag/lockfile written by `ingest.py` (or a process check).
+- Frontend: a small status card — progress bar (extracted/total), live node-type counts, running/idle pill, last-run time. Poll ~2s.
+
+**Stretch:**
+- Stream progress over **SSE** (reuse the existing event-stream infra from `/chat`) so it updates live during ingest instead of polling.
+- Tie into **GraphCanvas** so the graph visibly *grows* as ingestion proceeds — strong demo moment.
+- Kick off ingest from the UI (select/upload corpus → `POST /ingest`) instead of the CLI.
+
+**Touch points:** `ingest.py` (emit a progress heartbeat + write a status record), a new `api/` route, a frontend status component. Reuse the counts logic from `scripts/visualize_graph.py` / the Cypher we've been running this session.
+
 ## Resumable ingestion (checkpoint / state pointer)
 **Status:** ✅ DONE (2026-05-30) — implemented & tested. Kept below for reference.
 **Why:** Re-running ingestion after an error/kill is idempotent (no duplicate nodes) but NOT cost-saving — it re-embeds and re-extracts every chunk, including completed ones. The FATCA PDF (290 chunks) made this painful.

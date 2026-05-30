@@ -6,3 +6,4 @@ __pycache__/
 *.egg-info/
 graph_viz*.html
 sample_corpus/
+.playwright-mcp/
