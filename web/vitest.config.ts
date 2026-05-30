@@ -9,5 +9,9 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./", import.meta.url)),
     },
   },
-  test: { environment: "jsdom", globals: true },
+  test: {
+    environment: "jsdom",
+    globals: true,
+    exclude: ["e2e/**", "node_modules/**"],
+  },
 });
