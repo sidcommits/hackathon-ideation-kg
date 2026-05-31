@@ -93,41 +93,74 @@ class _VoiceSplitter:
     """Route a voice synthesis stream into (channel, text) pairs.
 
     Model output: an optional [SPOKEN] label, the spoken paragraph, a [DETAIL]
-    delimiter, then the full markdown answer. The spoken section is buffered and
-    emitted as ONE ("spoken", ...) pair the moment [DETAIL] is found; everything
-    after streams as ("detail", ...). If the stream ends without ever seeing
-    [DETAIL] (malformed), flush() emits the whole buffer as ("both", ...) so the
-    avatar still speaks and the chat still fills.
+    delimiter, then the full markdown answer.
+
+    Spoken tokens are streamed progressively to the avatar as they arrive — NOT
+    buffered until [DETAIL] is found. Buffering the entire spoken section created
+    an 8-12 s silent gap after the ack token, causing Beyond Presence to time out
+    and cut off the avatar mid-turn.
+
+    Protocol:
+      1. Buffer the first _LABEL_BUF chars to detect and strip any [SPOKEN] label.
+      2. Once the label is gone, stream spoken tokens directly (keeping a short tail
+         to safely straddle a [DETAIL] tag that arrives across chunk boundaries).
+      3. When [DETAIL] is found, switch to detail mode and stream everything after.
+      4. flush() drains whatever remains (handles max_tokens truncation).
     """
+
+    # Chars to hold before we're confident the [SPOKEN] label has been seen/stripped.
+    _LABEL_BUF = 60
+    # Chars kept as a look-ahead tail so [DETAIL] can't be missed at a chunk edge.
+    _TAIL = len("[DETAIL]") + 10  # ~18
 
     def __init__(self):
         self._buf = ""
+        self._label_stripped = False
         self._in_detail = False
 
     def feed(self, text: str):
         if self._in_detail:
             return [("detail", text)] if text else []
+
         self._buf += text
-        m = _DETAIL_TAG_RE.search(self._buf)
-        if not m:
-            return []  # still buffering the spoken section
         out = []
-        spoken = _strip_spoken_tag(self._buf[:m.start()])
-        if spoken:
-            out.append(("spoken", spoken))
-        rest = self._buf[m.end():].lstrip("\n ")
-        self._buf = ""
-        self._in_detail = True
-        if rest:
-            out.append(("detail", rest))
+
+        # Phase 1 — label stripping: hold until we have enough chars to be sure.
+        if not self._label_stripped:
+            if len(self._buf) < self._LABEL_BUF and not _DETAIL_TAG_RE.search(self._buf):
+                return []  # still accumulating for label detection
+            self._buf = _SPOKEN_TAG_RE.sub("", self._buf).lstrip("\n ")
+            self._label_stripped = True
+
+        # Phase 2 — progressive spoken streaming: emit all but the look-ahead tail.
+        m = _DETAIL_TAG_RE.search(self._buf)
+        if m:
+            # [DETAIL] found — emit remaining spoken part, switch to detail.
+            spoken_part = self._buf[: m.start()].rstrip()
+            if spoken_part:
+                out.append(("spoken", spoken_part))
+            rest = self._buf[m.end() :].lstrip("\n ")
+            self._buf = ""
+            self._in_detail = True
+            if rest:
+                out.append(("detail", rest))
+        else:
+            # Not in detail yet — stream everything except the tail so [DETAIL]
+            # can never be split across two feed() calls.
+            if len(self._buf) > self._TAIL:
+                to_emit = self._buf[: -self._TAIL]
+                self._buf = self._buf[-self._TAIL :]
+                if to_emit:
+                    out.append(("spoken", to_emit))
+
         return out
 
     def flush(self):
         if self._in_detail:
             return []
-        whole = _strip_spoken_tag(self._buf)
+        remaining = self._buf if self._label_stripped else _strip_spoken_tag(self._buf)
         self._buf = ""
-        return [("both", whole)] if whole else []
+        return [("both", remaining)] if remaining else []
 
 
 async def run_agent(
@@ -249,7 +282,7 @@ async def run_agent(
     try:
         async with client.messages.stream(
             model=model,
-            max_tokens=2048,
+            max_tokens=4096,
             system=augmented_system,
             messages=convo,
         ) as stream:
