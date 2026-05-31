@@ -29,7 +29,7 @@ export function ChatThread({
               ) : (
                 <>
                   <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--accent)] shadow-[0_0_6px_var(--accent-glow)]" />
-                  <span>Company Brain</span>
+                  <span>Clooless</span>
                 </>
               )}
             </div>

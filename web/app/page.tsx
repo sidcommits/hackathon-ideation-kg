@@ -81,9 +81,7 @@ export default function Home() {
             <BrandMark />
             <div className="leading-tight">
               <div className="flex items-baseline gap-2">
-                <span className="display text-[19px] tracking-[0.02em] text-[color:var(--fg)]">SIX</span>
-                <span className="text-[color:var(--brass)]">·</span>
-                <span className="display text-[19px] italic text-[color:var(--fg-2)]">Company Brain</span>
+                <span className="display text-[19px] tracking-[0.02em] text-[color:var(--fg)]">Clooless</span>
               </div>
               <div className="kicker mt-0.5 text-[length:var(--text-2xs)]">
                 Regulatory Reference · Traced &amp; Governed
@@ -102,7 +100,7 @@ export default function Home() {
                 onClick={() => void reflect()}
                 disabled={reflecting}
                 className="rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-2)]/70 px-2.5 py-1 text-[length:var(--text-xs)] font-medium uppercase tracking-[0.12em] text-[color:var(--fg-2)] transition-colors hover:border-[color:var(--accent-dim)] hover:text-[color:var(--accent)] disabled:opacity-40 cursor-pointer"
-                title="Distill this chat and teach the Company Brain"
+                title="Distill this chat and teach Clooless"
               >
                 {reflecting ? "Reflecting…" : "Teach the Brain"}
               </button>
@@ -209,8 +207,8 @@ export default function Home() {
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder={mic.recording ? "Listening…" : "Ask the company brain…"}
-                  aria-label="Ask the company brain"
+                  placeholder={mic.recording ? "Listening…" : "Ask Clooless…"}
+                  aria-label="Ask Clooless"
                   className="min-w-0 flex-1 bg-transparent py-1 text-[15px] text-[color:var(--fg)] placeholder:text-[color:var(--fg-3)] outline-none"
                 />
                 {mic.supported && (
@@ -300,13 +298,11 @@ export default function Home() {
 
 function BrandMark() {
   return (
-    <div className="relative grid h-9 w-9 place-items-center rounded-md overflow-hidden">
-      <img
-        src="/rix_logo.png"
-        alt="RIX logo"
-        className="h-9 w-9 object-contain mix-blend-lighten"
-      />
-    </div>
+    <img
+      src="/logo_brain.png"
+      alt="Company Brain logo"
+      className="h-9 w-9 rounded-md object-contain"
+    />
   );
 }
 
@@ -414,7 +410,7 @@ function EmptyState({ onPick, busy, startCall, isAgentRegistered, onConfigure }:
         {/* Kicker */}
         <div className="kicker flex items-center justify-center gap-3">
           <span className="rule-red inline-block" aria-hidden style={{ animationDelay: "0.3s" }} />
-          The Company Brain — Regulatory Reference
+          Clooless — Regulatory Reference
         </div>
 
         {/* Headline — editorial cover */}

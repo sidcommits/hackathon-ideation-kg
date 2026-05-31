@@ -15,7 +15,7 @@ interface Contributor {
 
 const CONTRIBUTORS: Contributor[] = [
   { rank: 1,  name: "Miriam Schäfer",    role: "Reference Data Specialist",     initials: "MS", avatarHue: 217, karma: 4820, weeklyDelta:  2 },
-  { rank: 2,  name: "Thomas Gruber",     role: "MiFID II Compliance Lead",      initials: "TG", avatarHue: 262, karma: 4310, weeklyDelta:  0 },
+  { rank: 2,  name: "Stefan Köpsell",    role: "MiFID II Compliance Lead",      initials: "SK", avatarHue: 262, karma: 4310, weeklyDelta:  0 },
   { rank: 3,  name: "Priya Nair",        role: "ESG Data Analyst",              initials: "PN", avatarHue: 158, karma: 3975, weeklyDelta:  1 },
   { rank: 4,  name: "Lukas Baumgartner", role: "FATCA Reporting Officer",       initials: "LB", avatarHue:  38, karma: 3640, weeklyDelta: -1 },
   { rank: 5,  name: "Sofia Meier",       role: "Regulatory Navigator PM",       initials: "SM", avatarHue: 328, karma: 3280, weeklyDelta:  3 },
@@ -126,7 +126,7 @@ export default function LeaderboardPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/"
-            aria-label="Back to Company Brain"
+            aria-label="Back to Clooless"
             className="flex h-9 w-9 items-center justify-center rounded-xl border border-[color:var(--line-2)] bg-[color:var(--bg-2)] text-[color:var(--fg-2)] transition-colors hover:border-[color:var(--accent-dim)] hover:text-[color:var(--accent)]"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -135,9 +135,7 @@ export default function LeaderboardPage() {
           </Link>
           <div className="leading-tight">
             <div className="flex items-center gap-2 text-[13px] font-semibold tracking-tight text-[color:var(--fg)]">
-              SIX
-              <span className="text-[color:var(--fg-3)]">·</span>
-              <span className="font-medium text-[color:var(--fg-2)]">Company Brain</span>
+              Clooless
             </div>
             <div className="text-[length:var(--text-xs)] uppercase tracking-[0.18em] text-[color:var(--fg-3)]">
               Knowledge Champions
@@ -154,7 +152,7 @@ export default function LeaderboardPage() {
             <span className="text-3xl">🏆</span>
           </div>
           <h1 className="display text-[30px] font-semibold text-[color:var(--fg)] sm:text-[38px]">
-            Company Brain Champions
+            Clooless Champions
           </h1>
           <div className="mt-3 flex items-center justify-center gap-1.5 text-[length:var(--text-xs)] text-[color:var(--fg-3)]">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -177,7 +175,7 @@ export default function LeaderboardPage() {
           <span className="text-2xl shrink-0" aria-hidden>🏖️</span>
           <div className="min-w-0">
             <p className="text-[14px] font-semibold text-amber-400 leading-snug">
-              Contribute more to the brain — earn extra relaxing holidays!
+              Contribute more to Clooless — earn extra relaxing holidays!
             </p>
             <p className="mt-0.5 text-[11.5px] text-[color:var(--fg-3)] leading-snug">
               Top contributor this quarter takes home 3 bonus vacation days. Every insight you share moves you up.

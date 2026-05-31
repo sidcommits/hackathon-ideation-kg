@@ -31,9 +31,9 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SIX · Company Brain",
+  title: "Clooless",
   description:
-    "Traceable, governed answers over SIX regulatory reference-data knowledge — every claim cited to its source.",
+    "Traceable, governed answers over regulatory reference-data knowledge — every claim cited to its source.",
 };
 
 export default function RootLayout({
