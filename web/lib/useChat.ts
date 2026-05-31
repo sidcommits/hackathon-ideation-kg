@@ -29,6 +29,19 @@ export function useChat() {
   stateRef.current = state;
   const eventSourceRef = useRef<EventSource | null>(null);
 
+  // The persistent EventSource is created once in a mount effect (empty deps),
+  // which Next.js Fast Refresh does NOT re-run — so its onmessage closure would
+  // otherwise keep calling a STALE `reduce` (e.g. one without the latest event
+  // case) after any hot edit, silently dropping events. Routing every frame
+  // through this ref — reassigned on EVERY render with the CURRENT reduce — keeps
+  // the long-lived handler dispatching through up-to-date code.
+  const applyEventRef = useRef<(ev: ChatEvent) => void>(() => {});
+  applyEventRef.current = (ev: ChatEvent) => {
+    setState((s) => reduce(s, ev));
+    if (ev.type === "tool_call") setIsSpeaking(true);
+    else if (ev.type === "message_end") setIsSpeaking(false);
+  };
+
   // Standard text-chat loop
   const send = useCallback(async (text: string) => {
     const withUser = appendUser(stateRef.current, text);
@@ -227,14 +240,9 @@ export function useChat() {
 
     es.onmessage = (event) => {
       try {
-        const ev: ChatEvent = JSON.parse(event.data);
-        setState((s) => reduce(s, ev));
-
-        if (ev.type === "tool_call") {
-          setIsSpeaking(true);
-        } else if (ev.type === "message_end") {
-          setIsSpeaking(false);
-        }
+        // Dispatch through the ref so this once-created handler always uses the
+        // latest reducer (survives Fast Refresh — see applyEventRef above).
+        applyEventRef.current(JSON.parse(event.data) as ChatEvent);
       } catch (err) {
         console.error("Failed to parse parallel call event:", err);
       }

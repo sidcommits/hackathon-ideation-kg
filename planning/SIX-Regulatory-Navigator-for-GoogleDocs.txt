@@ -1,0 +1,180 @@
+           MiFID II Reference Data
+           The MiFID II / MiFIR regulatory framework has been introduced to bring greater transparency,
+           safety and more resilience to the ﬁnancial markets. The regulation brings enormous complexity
+           for ﬁrms throughout the industry in terms of generating, collecting and processing ﬁnancial data.
+
+           As a leading global provider of reference data and with a long history with regulations, we have
+           developed complete data sets relevant for Investor Protection and Transparency, Transaction and
+           Reference Data Reporting obligations stated in the various regulatory technical standards (RTS).
+
+           SIX provides more than 530 data ﬁelds - discover a ﬂavor of our oﬀering below.
+
+
+
+
+           For Transparency, Transaction
+           and Reference Data Reporting                                           12    Instruments details - leveraged,
+                                                                                        reportable, ESMA database ﬁelds
+                                                                                        Including the following:
+                                                                                        – Reportable Instrument
+                                                                                        – Instrument in ESMA database
+
+         Best trading venue ﬁelds
+         Including the following:                41
+                                                                                       64 MiFIR  and ESMA
+         – Best Trading Venue
+         – Suspension Market
+         – Best Trading Venue MIC
+                                                                                          classiﬁcation ﬁelds
+         – Suspension Market MIC                                                                   Including the following:
+
+
+
+
+                                                     26
+         – Liquidity Indicator                                                                     – ESMA Index Name
+                                                                                                   – ESMA transaction report Option Type
+                                                                                                   – ESMA transaction report Option exercise style
+                                                                                                   – ESMA transaction report Delivery Type style
+                                                                                                   – ESMA Commodity Base Product
+Waivers and
+                                         94
+                                                                                                   – ESMA Commodity Sub Product
+                                                                                                   – ESMA Commodity Further Sub Product
+deferrals ﬁelds                                       Core reference data fields                   – MiFIR equity products Product
+Including the following:                                                                           – MiFIR Non-equity Product
+– LIS pre trade - Threshold ﬂoor                      Including the following:                     – MiFIR Asset class of the underlying Product
+– LIS pre trade - Threshold value Amount              – Country of issue                           – MiFIR Contract type Product
+– LIS pre trade percentile Amount                     – Instrument Short Name                      – MiFIR Bond type Product
+– SSTI pre trade percentile Amount                    – CFI Code                                   – MiFIR Emissions Allowances sub type Product
+– SSTI pre trade - Threshold ﬂoor Amount                                                           – MiFIR Underlying type Product
+                                                      – Type of instrument
+– SSTI pre trade - Threshold value                                                                 – ESMA Seniority of the bond Product
+                                                      – Institution Full Name
+– LIS post trade - Threshold value Amount
+– LIS post trade - Volume percentile Amount           – Issue Date
+– LIS post trade - Threshold ﬂoor Amount              – Expiry Date
+
+
+
+                                                                                                 13
+– LIS post-trade percentile Amount                    – Strike Price Option
+– SSTI post trade Volume - percentile Amount          – ETD Type
+                                                                                                                 Eligibility and
+– SSTI post trade - Threshold value                   – Callable by debtor                                       complexity ﬁelds
+– SSTI post trade percentile Amount                                                                              Including the following:
+– SSTI post trade - Threshold ﬂoor Amount                                                                        – MiFID II Eligible Instrument
+– Volume Cap breached - All venue Indicator                                                                      – National Competent Authority
+
+
+
+                                                                                  31
+– Large scale order size 1/ delay 60 minutes                                                                        MiFID
+  Amount                                          Identiﬁers ﬁelds
+– Large scale order size 2/ delay 120 minutes     Including the following:
+
+
+                                                                                           32
+  Amount                                          – Identiﬁer (VALOR, ISIN,
+– Large scale order size 3/ End of the trading       SEDOL, CUSIP…)                                       ESMA post-trade
+  day Amount                                      – LEI                                                   transparency ﬁelds
+– Min. size of orders Amount                      – Underlying Instrument VALOR                           Including the following:
+– Total volume of trading (per currency)          – Underlying ISIN                                       – ADNA
+  Amount                                          – Underlying LEI                                        – ADNT
+– Total volume of trading under Reference         – Underlying Expiry Date                                – ADT
+  Pricewaiver Amount
+                                                                                                          – AVT
+– Total volume of trading under Negotiated
+                                                                                                          – ToTV
+  Transactions waiver Amount
+                                                                                                          – uToTV
+                                                      MiFID II Reference Data
+
+                                                      For Investor Protection                                                                31            Identiﬁers ﬁelds
+                                                                                                                                                           Including the following:
+                                                                                                                                                           – VALOR
+                                                                                                                                                           – ISIN
+                                                                                                                                                           – SEDOL
+                                                                                                                                                           – CUSIP
+
+
+
+
+                                          Target market
+                                          and distribution                         172
+                                          Including the following:
+                                          – Retail Clients Applicability
+                                          – Professional Clients Applicability
+                                                                                                                                                           23              Costs breakdown
+                                                                                                                                                                           Including the following:
+                                                                                                                                                                           – Type of fee
+
+
+
+
+                                                                                                        26
+                                          – Basic Knowledge and experience Applicability                                                                                   – Free of charge Indicator (Y)
+                                          – Informed Investor Applicability                                                                                                – Amount
+                                          – Experienced investor Applicability                                                                                             – FREQUENCY FEES/CHARGES
+                                          – Ability to bear losses - fully protected capital                                                                                 Number of time units
+                                            Applicability                                                                                                                  – Commission calculation basis
+                                          – Ability to bear losses - partially protected                                                                                   – MIN Amount
+                                            capital Applicability
+                                          – Ability to bear losses - not protected capital               Core reference data ﬁelds                                         – MAX Amount
+                                                                                                                                                                           – Fee pro rata temporis in %
+                                            Applicability
+                                                                                                          Including the following:
+                                          – Ability to bear losses - loss of more than
+                                                                                                          – Country of issue
+                                            capital Applicability
+                                          – Investment Objectives Horizon Short Term                      – Instrument Short Name
+                                            Applicability code                                            – CFI Code
+                                          – Investment Objectives Horizon Medium Term                     – Type of instrument
+                                            Applicability code                                            – Institution Full Name
+                                          – Investment Objectives Horizon Long Term
+                                            Applicability code
+                                          – Investment Objectives Very short term
+                                                                                                          – Issue Date
+                                                                                                          – Expiry Date                                       41               Best trading venue
+                                                                                                                                                                               Including the following:
+                                                                                                                                                                               – Best Trading Venue
+                                                                                                          – Strike Price Option
+                                            Applicability code                                                                                                                 – Best Trading Venue MIC
+                                          – Eligible Counterparty Applicability                           – ETD Type
+                                          – Investment Need Ethical Applicability code                    – Callable by debtor
+                                          – Investment Need Islamic Applicability code
+                                          – Investment Need ESG Applicability code
+                                          – Distribution Strategy Execution only
+                                            classiﬁcation
+                                          – Distribution Strategy advised classiﬁcation
+                                          – Distribution Strategy Portfolio management
+                                            classiﬁcation
+
+
+                                                                                                                                                                27
+                                          – Distribution Strategy Non advised services                                      Risk indicators
+                                            classiﬁcation
+                                                                                                                            Including the following:
+                                                                                                                            – SRI of PRIIPs
+                                                                                                                            – SRRI of UCITS
+                                                                                                                            – Manufacturer provided risk
+                                                                                                                              factor
+
+
+
+
+                                                      Ask us how ToSIXhelp financial institutions with MiFID II, SIX has engaged clients with interviews, workshops and formed the
+
+
+
+
+©SIX Financial Information Ltd. 11.2018
+                                                                       MiFID II Working Group with specialists from international financial institutions.
+
+                                                      we can help We can therefore deliver accurate and high quality reference, listing, and market data for all asset types over all
+                                                                                     instrument life cycles, including corporate actions, concentrating on Transparency,
+                                                                                     Transaction and Reference Data Reporting as well as Investor Protection.
+
+                                                                                     Contact a SIX sales representative and find out how we can help you with MiFID II
+                                                                                     compliance: sales.global@six-financial-information.com
+

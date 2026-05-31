@@ -127,13 +127,53 @@ def test_v1_chat_completions_non_streaming_returns_json(monkeypatch):
     assert data["choices"][0]["finish_reason"] == "stop"
 
 
-def _drain_global_queue():
+def _subscribe():
     import api.deps as deps
-    q = deps.ACTIVE_CALLS["hackathon-call-id"].event_queue
+    return deps.ACTIVE_CALLS["hackathon-call-id"].subscribe()
+
+
+def _drain(q):
     out = []
     while not q.empty():
         out.append(q.get_nowait())
     return out
+
+
+def test_mirror_turn_crosses_the_events_sse_wire():
+    """The hop nobody had verified: a broadcast MirrorTurn is actually serialized
+    and delivered over the /api/calls/{id}/events SSE stream. Subscribes via the
+    real endpoint, broadcasts, and reads a frame off body_iterator with a timeout —
+    so a broken handler FAILS fast instead of hanging."""
+    import asyncio
+    import api.deps as deps
+    from api.events import MirrorTurn
+
+    async def run():
+        call = deps.ACTIVE_CALLS["hackathon-call-id"]
+        call.subscribers.clear()
+
+        class _Req:
+            async def is_disconnected(self):
+                return False
+
+        resp = await main.call_events(call_id="hackathon-call-id", request=_Req())
+        call.broadcast(MirrorTurn(
+            question="WIRE_Q", answer="WIRE_A", citations=[],
+            graph_delta={"nodes": [], "edges": []},
+        ))
+        agen = resp.body_iterator
+        try:
+            for _ in range(3):                   # tolerate a leading keepalive ping
+                chunk = await asyncio.wait_for(agen.__anext__(), timeout=5)
+                text = chunk.decode() if isinstance(chunk, (bytes, bytearray)) else str(chunk)
+                if "mirror_turn" in text:
+                    return text
+        finally:
+            await agen.aclose()
+        return ""
+
+    frame = asyncio.run(run())
+    assert "mirror_turn" in frame and "WIRE_Q" in frame and "WIRE_A" in frame
 
 
 def test_v1_speaks_summary_and_mirrors_full_turn_atomically(monkeypatch):
@@ -149,8 +189,10 @@ def test_v1_speaks_summary_and_mirrors_full_turn_atomically(monkeypatch):
         yield MessageEnd(stop_reason="end_turn")
 
     monkeypatch.setattr(main, "run_agent", fake_agent)
-    _drain_global_queue()                            # isolate from prior tests
-    deps.ACTIVE_CALLS["hackathon-call-id"].inflight_questions.clear()
+    call = deps.ACTIVE_CALLS["hackathon-call-id"]
+    call.subscribers.clear()
+    call.inflight_questions.clear()
+    q = call.subscribe()                             # a live consumer, before the turn
 
     client = TestClient(app)
     resp = client.post("/v1/chat/completions", json={
@@ -164,7 +206,7 @@ def test_v1_speaks_summary_and_mirrors_full_turn_atomically(monkeypatch):
     assert "SPOKEN_SUMMARY" in body                  # avatar speaks the summary
     assert "DETAIL_BODY" not in body                 # full answer NOT spoken
 
-    drained = _drain_global_queue()
+    drained = _drain(q)
     # Exactly ONE atomic mirror event carries the whole turn — no token stream.
     turns = [e for e in drained if e.type == "mirror_turn"]
     assert len(turns) == 1
@@ -186,8 +228,9 @@ def test_v1_suppresses_concurrent_duplicate_but_allows_reask(monkeypatch):
 
     monkeypatch.setattr(main, "run_agent", fake_agent)
     call = deps.ACTIVE_CALLS["hackathon-call-id"]
-    _drain_global_queue()
+    call.subscribers.clear()
     call.inflight_questions.clear()
+    q = call.subscribe()
 
     client = TestClient(app)
     payload = {"messages": [{"role": "user", "content": "dup question"}], "stream": True}
@@ -195,12 +238,12 @@ def test_v1_suppresses_concurrent_duplicate_but_allows_reask(monkeypatch):
     # A concurrent duplicate (same question still in-flight) is suppressed.
     call.inflight_questions.add("dup question")          # simulate the first call in-flight
     client.post("/v1/chat/completions", json=payload)
-    assert [e for e in _drain_global_queue() if e.type == "mirror_turn"] == []
+    assert [e for e in _drain(q) if e.type == "mirror_turn"] == []
 
     # A later re-ask (nothing in-flight) DOES mirror — re-asking is not blocked.
     call.inflight_questions.clear()
     client.post("/v1/chat/completions", json=payload)
-    turns = [e for e in _drain_global_queue() if e.type == "mirror_turn"]
+    turns = [e for e in _drain(q) if e.type == "mirror_turn"]
     assert len(turns) == 1 and turns[0].question == "dup question"
 
 

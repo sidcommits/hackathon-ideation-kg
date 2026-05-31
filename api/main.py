@@ -361,17 +361,31 @@ async def get_agent_status():
 
 
 @app.get("/api/calls/{call_id}/events")
-async def call_events(call_id: str = Path(...)):
-    active = deps.ACTIVE_CALLS.get(call_id)
-    if not active:
+async def call_events(call_id: str = Path(...), request: Request = None):
+    if call_id not in deps.ACTIVE_CALLS:
         raise HTTPException(status_code=404, detail="Active call session not found")
 
+    # Each connection gets its OWN queue (fan-out), so concurrent / reconnecting /
+    # zombie consumers never steal each other's events.
+    queue = deps.ACTIVE_CALLS[call_id].subscribe()
+
     async def event_source():
-        while True:
-            # Poll from the queue and stream events to the frontend in real time
-            event = await active.event_queue.get()
-            yield {"data": event.model_dump_json()}
-            active.event_queue.task_done()
+        try:
+            while True:
+                if request is not None and await request.is_disconnected():
+                    break
+                if call_id not in deps.ACTIVE_CALLS:
+                    break
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=15)
+                except asyncio.TimeoutError:
+                    yield {"event": "ping", "data": "{}"}   # keepalive; not a 'message'
+                    continue
+                yield {"data": event.model_dump_json()}
+        finally:
+            active = deps.ACTIVE_CALLS.get(call_id)
+            if active is not None:
+                active.unsubscribe(queue)
 
     return EventSourceResponse(event_source())
 
@@ -479,7 +493,7 @@ async def chat_completions(req: BPCompletionsRequest):
         finally:
             spoken_q.put_nowait(_DONE)
             if should_mirror and active_call:
-                active_call.event_queue.put_nowait(MirrorTurn(
+                active_call.broadcast(MirrorTurn(
                     question=_last,
                     answer="".join(answer_parts).strip(),
                     citations=citations,
