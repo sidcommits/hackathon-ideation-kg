@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { useDictation } from "@/lib/useDictation";
 import { useChat } from "@/lib/useChat";
 import { ChatThread } from "@/components/ChatThread";
@@ -72,7 +73,7 @@ export default function Home() {
   };
 
   return (
-    <main className="brain-canvas grid h-screen grid-cols-1 text-[color:var(--fg)] lg:grid-cols-[1fr_minmax(420px,500px)]">
+    <main className="brain-canvas grid h-screen grid-cols-[1fr_auto] text-[color:var(--fg)]">
       {/* ── Conversation column ─────────────────────────────── */}
       <section className="relative flex min-w-0 flex-col overflow-hidden">
         <header className="flex items-center justify-between border-b border-[color:var(--line)] px-6 py-4">
@@ -106,6 +107,14 @@ export default function Home() {
                 {reflecting ? "Reflecting…" : "Teach the Brain"}
               </button>
             )}
+            <Link
+              href="/leaderboard"
+              className="flex h-8 items-center gap-1.5 rounded-xl border border-[color:var(--line)] bg-[color:var(--bg-2)]/70 px-2.5 text-[color:var(--fg-2)] hover:text-[color:var(--fg)] hover:border-[color:var(--accent-dim)] transition-all"
+              title="Knowledge Champions Leaderboard"
+            >
+              <span className="text-sm">🏆</span>
+              <span className="hidden text-[length:var(--text-xs)] font-medium sm:block">Leaderboard</span>
+            </Link>
             <ThemeToggle />
             <button
               onClick={() => setShowConfig(!showConfig)}
@@ -254,9 +263,17 @@ export default function Home() {
         />
       </section>
 
-      {/* ── Sources & Relations column (replaces the graph viz; GraphCanvas code retained) ── */}
-      <aside className="relative hidden border-l border-[color:var(--line)] bg-[color:var(--bg)] lg:block">
-        <DockedSourcesPanel message={sourcesMsg ?? latestAnswer} focusDoc={focusDoc} focusNonce={focusNonce} />
+      {/* ── Sources & Relations column — always in DOM so width can animate ── */}
+      <aside
+        className={`relative hidden lg:block overflow-hidden transition-[width] duration-500 ease-in-out bg-[color:var(--bg)] ${
+          latestAnswer
+            ? "w-[440px] border-l border-[color:var(--line)]"
+            : "w-0 border-transparent"
+        }`}
+      >
+        {latestAnswer && (
+          <DockedSourcesPanel message={sourcesMsg ?? latestAnswer} focusDoc={focusDoc} focusNonce={focusNonce} />
+        )}
       </aside>
 
       {/* Recursive improvement: preview distilled truths, accept/reject before ingest */}
@@ -281,16 +298,14 @@ export default function Home() {
   );
 }
 
-/* ── Colophon: an engraved brass monogram (institutional, monochrome) ─── */
 function BrandMark() {
   return (
-    <div className="relative grid h-9 w-9 place-items-center rounded-md border border-[color:var(--brass-dim)]/60 bg-[color:var(--bg-2)]">
-      <span className="absolute inset-[3px] rounded-[3px] border border-[color:var(--brass-dim)]/30" aria-hidden />
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden className="text-[color:var(--brass)]">
-        {/* a bound-volume / open-ledger mark */}
-        <path d="M12 5c-2-1.4-4.2-1.6-6.5-1.2v13c2.3-.4 4.5-.2 6.5 1.2 2-1.4 4.2-1.6 6.5-1.2v-13C16.2 3.4 14 3.6 12 5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-        <path d="M12 5v13" stroke="currentColor" strokeWidth="1.4" />
-      </svg>
+    <div className="relative grid h-9 w-9 place-items-center rounded-md overflow-hidden">
+      <img
+        src="/rix_logo.png"
+        alt="RIX logo"
+        className="h-9 w-9 object-contain mix-blend-lighten"
+      />
     </div>
   );
 }
@@ -394,21 +409,21 @@ interface EmptyStateProps {
 
 function EmptyState({ onPick, busy, startCall, isAgentRegistered, onConfigure }: EmptyStateProps) {
   return (
-    <div className="flex h-full items-center px-6 sm:px-10 lg:px-16">
+    <div className="flex h-full items-center justify-center px-6 sm:px-10">
       <div className="hero-stagger w-full max-w-2xl">
         {/* Kicker */}
-        <div className="kicker flex items-center gap-3">
+        <div className="kicker flex items-center justify-center gap-3">
           <span className="rule-red inline-block" aria-hidden style={{ animationDelay: "0.3s" }} />
           The Company Brain — Regulatory Reference
         </div>
 
         {/* Headline — editorial cover */}
-        <h1 className="display headline-print mt-5 text-balance text-[40px] leading-[1.02] text-[color:var(--fg)] sm:text-[58px]">
+        <h1 className="display headline-print mt-5 text-balance text-center text-[40px] leading-[1.02] text-[color:var(--fg)] sm:text-[58px]">
           Ask the institution&rsquo;s <em>memory</em>.
         </h1>
 
         {/* Lede */}
-        <p className="mt-5 max-w-xl text-pretty text-[length:var(--text-md)] leading-relaxed text-[color:var(--fg-2)]">
+        <p className="mt-5 text-pretty text-center text-[length:var(--text-md)] leading-relaxed text-[color:var(--fg-2)]">
           Expert knowledge on instrument coverage and regulatory classification —
           MiFID&nbsp;II, SFDR, FATCA — synthesised from source documents and SME
           interviews, with every claim traced back to the passage it rests on.
@@ -436,7 +451,7 @@ function EmptyState({ onPick, busy, startCall, isAgentRegistered, onConfigure }:
         </div>
 
         {/* Video advisor — quiet, brass-outlined. Registration lives behind the gear. */}
-        <div className="mt-7">
+        <div className="mt-7 flex justify-center">
           {isAgentRegistered ? (
             <button
               type="button"

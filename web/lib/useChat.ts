@@ -43,39 +43,51 @@ export function useChat() {
   };
 
   // Standard text-chat loop
-  const send = useCallback(async (text: string) => {
-    const withUser = appendUser(stateRef.current, text);
-    setState(withUser);
-    setBusy(true);
+  const send = useCallback(
+    async (text: string) => {
+      const withUser = appendUser(stateRef.current, text);
+      setState(withUser);
+      setBusy(true);
 
-    const history = withUser.messages.map((m) => ({ role: m.role, content: m.text }));
-    try {
-      const resp = await fetch(`${API}/chat`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ messages: history, max_sensitivity: clearance }),
-      });
-      if (!resp.ok || !resp.body) throw new Error(`Request failed: HTTP ${resp.status}`);
+      const history = withUser.messages.map((m) => ({
+        role: m.role,
+        content: m.text,
+      }));
+      try {
+        const resp = await fetch(`${API}/chat`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            messages: history,
+            max_sensitivity: clearance,
+          }),
+        });
+        if (!resp.ok || !resp.body)
+          throw new Error(`Request failed: HTTP ${resp.status}`);
 
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const { events, rest } = parseSSEChunk(buffer);
-        buffer = rest;
-        for (const ev of events) {
-          setState((s) => reduce(s, ev));
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const { events, rest } = parseSSEChunk(buffer);
+          buffer = rest;
+          for (const ev of events) {
+            setState((s) => reduce(s, ev));
+          }
         }
+      } catch (e) {
+        setState((s) =>
+          reduce(s, { type: "token", text: `\n\n⚠️ Error: ${String(e)}` }),
+        );
+      } finally {
+        setBusy(false);
       }
-    } catch (e) {
-      setState((s) => reduce(s, { type: "token", text: `\n\n⚠️ Error: ${String(e)}` }));
-    } finally {
-      setBusy(false);
-    }
-  }, [clearance]);
+    },
+    [clearance],
+  );
 
   // ── Recursive improvement: distill chat → truths (read-only), preview, ingest ──
   const reflect = useCallback(async () => {
@@ -92,7 +104,10 @@ export function useChat() {
       });
       const data = await resp.json();
       if (data.ok !== false) {
-        setReflection({ summary: data.summary ?? "", truths: data.truths ?? [] });
+        setReflection({
+          summary: data.summary ?? "",
+          truths: data.truths ?? [],
+        });
       }
     } catch (e) {
       console.error("reflect failed:", e);
@@ -101,31 +116,37 @@ export function useChat() {
     }
   }, [clearance]);
 
-  const ingestLearnings = useCallback(async (selected: Truth[]) => {
-    if (selected.length === 0) {
-      setReflection(null);
-      return;
-    }
-    setIngesting(true);
-    try {
-      const resp = await fetch(`${API}/learnings/ingest`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ truths: selected, max_sensitivity: clearance }),
-      });
-      const data = await resp.json();
-      setLearnedFlash(
-        data.ok === false
-          ? "Could not save learnings."
-          : `Saved ${data.chunks_written} learning(s) to the brain.`,
-      );
-      setReflection(null);
-    } catch {
-      setLearnedFlash("Could not save learnings.");
-    } finally {
-      setIngesting(false);
-    }
-  }, [clearance]);
+  const ingestLearnings = useCallback(
+    async (selected: Truth[]) => {
+      if (selected.length === 0) {
+        setReflection(null);
+        return;
+      }
+      setIngesting(true);
+      try {
+        const resp = await fetch(`${API}/learnings/ingest`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            truths: selected,
+            max_sensitivity: clearance,
+          }),
+        });
+        const data = await resp.json();
+        setLearnedFlash(
+          data.ok === false
+            ? "Could not save learnings."
+            : `Saved ${data.chunks_written} learning(s) to the brain.`,
+        );
+        setReflection(null);
+      } catch {
+        setLearnedFlash("Could not save learnings.");
+      } finally {
+        setIngesting(false);
+      }
+    },
+    [clearance],
+  );
 
   const dismissReflection = useCallback(() => setReflection(null), []);
 
@@ -134,11 +155,14 @@ export function useChat() {
     setBusy(true);
     try {
       const resp = await fetch(`${API}/api/agent/status`);
-      if (!resp.ok) throw new Error("Failed to resolve active digital agent ID.");
+      if (!resp.ok)
+        throw new Error("Failed to resolve active digital agent ID.");
       const statusData = await resp.json();
-      
+
       if (!statusData.registered || !statusData.agentId) {
-        throw new Error("No active Agent ID available. Please register your public tunnel URL first.");
+        throw new Error(
+          "No active Agent ID available. Please register your public tunnel URL first.",
+        );
       }
 
       // Sync clearance state with the active session
@@ -184,7 +208,9 @@ export function useChat() {
       });
       const data = await resp.json();
       if (!resp.ok || !data.success) {
-        throw new Error(data.detail || data.error || "Failed to register agent.");
+        throw new Error(
+          data.detail || data.error || "Failed to register agent.",
+        );
       }
       setIsAgentRegistered(true);
       alert("Beyond Presence Agent successfully created and registered!");
@@ -212,24 +238,24 @@ export function useChat() {
 
   // Fetch initial knowledge graph, connect persistent SSE events, and cleanup on mount
   useEffect(() => {
-    async function fetchGraphAndStatus() {
-      try {
-        const resp = await fetch(`${API}/api/graph?limit=50`);
-        if (resp.ok) {
-          const graphData = await resp.json();
-          setState((s) => reduce(s, { type: "init_graph", graph: graphData }));
-        }
+    // async function fetchGraphAndStatus() {
+    //   try {
+    //     const resp = await fetch(`${API}/api/graph?limit=50`);
+    //     if (resp.ok) {
+    //       const graphData = await resp.json();
+    //       setState((s) => reduce(s, { type: "init_graph", graph: graphData }));
+    //     }
 
-        const statusResp = await fetch(`${API}/api/agent/status`);
-        if (statusResp.ok) {
-          const statusData = await statusResp.json();
-          setIsAgentRegistered(statusData.registered);
-        }
-      } catch (err) {
-        console.error("Failed to load initial graph or status:", err);
-      }
-    }
-    void fetchGraphAndStatus();
+    //     const statusResp = await fetch(`${API}/api/agent/status`);
+    //     if (statusResp.ok) {
+    //       const statusData = await statusResp.json();
+    //       setIsAgentRegistered(statusData.registered);
+    //     }
+    //   } catch (err) {
+    //     console.error("Failed to load initial graph or status:", err);
+    //   }
+    // }
+    // void fetchGraphAndStatus();
 
     // Initialize persistent parallel EventSource stream to capture dynamic GraphRAG deltas
     const es = new EventSource(`${API}/api/calls/hackathon-call-id/events`);
