@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useDictation } from "@/lib/useDictation";
 import { useChat } from "@/lib/useChat";
@@ -41,6 +41,18 @@ export default function Home() {
   const [showConfig, setShowConfig] = useState(false);
   const [tunnelUrl, setTunnelUrl] = useState("");
   const [registering, setRegistering] = useState(false);
+
+  // Persist tunnel URL across page loads
+  useEffect(() => {
+    const saved = localStorage.getItem("tunnelUrl");
+    if (saved) setTunnelUrl(saved);
+  }, []);
+
+  const handleTunnelUrlChange = (url: string) => {
+    setTunnelUrl(url);
+    if (url.trim()) localStorage.setItem("tunnelUrl", url.trim());
+    else localStorage.removeItem("tunnelUrl");
+  };
   const hasMessages = state.messages.length > 0;
 
   // Sources panel: which answer it shows, and (when a citation is clicked) which
@@ -138,7 +150,7 @@ export default function Home() {
                       type="url"
                       placeholder="https://xxxx.locallt.ly"
                       value={tunnelUrl}
-                      onChange={(e) => setTunnelUrl(e.target.value)}
+                      onChange={(e) => handleTunnelUrlChange(e.target.value)}
                       className="w-full rounded-lg border border-[color:var(--line-2)] bg-[color:var(--bg)] px-3 py-1.5 text-xs text-[color:var(--fg)] placeholder:text-[color:var(--fg-3)] outline-none focus:border-[color:var(--accent)]"
                     />
                   </div>
