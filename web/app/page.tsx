@@ -83,9 +83,7 @@ export default function Home() {
               <div className="flex items-baseline gap-2">
                 <span className="display text-[19px] tracking-[0.02em] text-[color:var(--fg)]">Clooless</span>
               </div>
-              <div className="kicker mt-0.5 text-[length:var(--text-2xs)]">
-                Regulatory Reference · Traced &amp; Governed
-              </div>
+
             </div>
           </div>
           <div className="flex items-center gap-4 relative">
