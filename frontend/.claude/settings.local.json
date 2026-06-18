@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s \"https://api.dicebear.com/9.x/bottts-neutral/svg?seed=mastishq&backgroundColor=dbeafe\" -o public/avatar-placeholder.png)",
+      "Bash(npm install *)",
+      "Bash(npm run *)"
+    ]
+  }
+}
